@@ -1,0 +1,12 @@
+{
+  "configurations": [
+
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Launch OAuth Webpage (HTTPS)",
+      "url": "https://localhost:3000/index.html",
+      "webRoot": "${workspaceFolder}/oauth-webpage/src"
+    }
+  ]
+}

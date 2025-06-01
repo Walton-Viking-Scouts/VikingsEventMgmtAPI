@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OSM Auth Callback</title>
+</head>
+<body>
+    <h1>Authenticating...</h1>
+    <script>
+        // OSM will redirect here with ?oauth=... or #access_token=...
+        const params = new URLSearchParams(window.location.search);
+        const oauth = params.get('oauth');
+        if (oauth) {
+            // You may need to exchange this for a token, or store it directly
+            localStorage.setItem('access_token', oauth);
+            window.location.href = 'index.html';
+        } else {
+            document.body.innerHTML = '<h1>Authentication failed.</h1>';
+        }
+    </script>
+</body>
+</html>

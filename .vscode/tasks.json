@@ -1,0 +1,11 @@
+{
+  "tasks": [
+    {
+      "label": "start-live-server",
+      "type": "npm",
+      "script": "start",
+      "path": "oauth-webpage",
+      "problemMatcher": []
+    }
+  ]
+}
