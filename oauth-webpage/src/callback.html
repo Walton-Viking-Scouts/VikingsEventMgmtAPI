@@ -7,15 +7,31 @@
 <body>
     <h1>Authenticating...</h1>
     <script>
-        // OSM will redirect here with ?oauth=... or #access_token=...
+        // Get the ?code=... from the URL
         const params = new URLSearchParams(window.location.search);
-        const oauth = params.get('oauth');
-        if (oauth) {
-            // You may need to exchange this for a token, or store it directly
-            localStorage.setItem('access_token', oauth);
-            window.location.href = 'index.html';
+        const code = params.get('code');
+        if (code) {
+            // Exchange code for access token via backend
+            fetch('http://localhost:3001/exchange-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: code,
+                    redirect_uri: window.location.origin + '/callback.html'
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log('Token exchange response:', data); // Add this line
+                if (data.access_token) {
+                    localStorage.setItem('access_token', data.access_token);
+                    window.location.href = 'index.html';
+                } else {
+                    document.body.innerHTML = '<h1>Authentication failed.</h1><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                }
+            });
         } else {
-            document.body.innerHTML = '<h1>Authentication failed.</h1>';
+            document.body.innerHTML = '<h1>No code found in URL.</h1>';
         }
     </script>
 </body>

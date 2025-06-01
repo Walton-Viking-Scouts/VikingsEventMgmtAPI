@@ -1,24 +1,10 @@
+const clientId = 'JiZxFkZiFaBrlyO6g4cCBEfig1hOKEex'; // Your API ID
 const scope = 'section:member:read';
+const redirectUri = window.location.origin + '/callback.html';
 
 function redirectToOSMLogin() {
-    const redirectUri = window.location.origin + '/oauth-webpage/src/callback.html';
-
-    fetch('http://localhost:3001/get-oauth-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            redirect_uri: redirectUri,
-            scope: scope
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.oauth) {
-            window.location.href = `https://www.onlinescoutmanager.co.uk/login.php?oauth=${data.oauth}`;
-        } else {
-            alert('Failed to get OAuth key');
-        }
-    });
+    const authUrl = `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+    window.location.href = authUrl;
 }
 
 document.getElementById('osm-login-btn').addEventListener('click', redirectToOSMLogin);
@@ -30,16 +16,49 @@ async function getTerms() {
         return;
     }
 
-    const response = await fetch('https://www.onlinescoutmanager.co.uk/api.php?action=getTerms', {
-        method: 'GET',
-        headers: {
-            'Authorization': token
-        }
+    const response = await fetch('http://localhost:3001/get-terms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: token })
     });
 
     const data = await response.json();
-    document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
-    console.log('getTerms response:', data);
+    // Hide the raw API response from the user
+    // document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+
+    // Extract section IDs from getTerms
+    const sectionIds = Object.keys(data);
+
+    // Fetch user roles to get section names
+    const rolesRes = await fetch('http://localhost:3001/get-user-roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: token })
+    });
+    const roles = await rolesRes.json();
+
+    // Map sectionid to sectionname
+    const sectionIdToName = {};
+    roles.forEach(role => {
+        if (role.sectionid && role.sectionname) {
+            sectionIdToName[role.sectionid] = role.sectionname;
+        }
+    });
+
+    // Create dropdown
+    let dropdown = document.getElementById('section-dropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('select');
+        dropdown.id = 'section-dropdown';
+        document.querySelector('.login-container').appendChild(dropdown);
+    }
+    dropdown.innerHTML = '';
+    sectionIds.forEach(sectionid => {
+        const option = document.createElement('option');
+        option.value = sectionid;
+        option.textContent = sectionIdToName[sectionid] || sectionid;
+        dropdown.appendChild(option);
+    });
 }
 
 document.getElementById('get-terms-btn').addEventListener('click', getTerms);
