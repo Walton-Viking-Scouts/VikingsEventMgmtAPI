@@ -5,8 +5,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const apiid = 'JiZxFkZiFaBrlyO6g4cCBEfig1hOKEex';   // <-- Replace with your actual API ID
-const token = 'cvNCEYpxZOGUIXmxTm3cyJpOb0QhvKkZm1hK6A0wY46HxOe1cH2DYWHVPykdq54u'; // <-- Replace with your actual API Token
+const apiid = 'vifnubG1UFN63p8n3qK5wnOTHs5QQimP';   // <-- Replace with your actual API ID
+const token = 'HOvO2kixyojDMOVGJaeM1TSDb9Rggez45fRe2gkxqRMUjgdzJOYp2Ce2yb9HMifM'; // <-- Replace with your actual API Token
 
 // Exchange code for access token
 app.post('/exchange-token', async (req, res) => {
