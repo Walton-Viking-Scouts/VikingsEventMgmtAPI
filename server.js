@@ -5,16 +5,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const apiid = 'vifnubG1UFN63p8n3qK5wnOTHs5QQimP';   // <-- Replace with your actual API ID
-const token = 'HOvO2kixyojDMOVGJaeM1TSDb9Rggez45fRe2gkxqRMUjgdzJOYp2Ce2yb9HMifM'; // <-- Replace with your actual API Token
+const oauthclientid = 'vifnubG1UFN63p8n3qK5wnOTHs5QQimP';   // <-- Replace with your actual API ID
+const oauthsecret = 'HOvO2kixyojDMOVGJaeM1TSDb9Rggez45fRe2gkxqRMUjgdzJOYp2Ce2yb9HMifM'; // <-- Replace with your actual API Token
 
 // Exchange code for access token
 app.post('/exchange-token', async (req, res) => {
     const { code, redirect_uri } = req.body;
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
-    params.append('client_id', apiid);
-    params.append('client_secret', token);
+    params.append('client_id', oauthclientid);
+    params.append('client_secret', oauthsecret);
     params.append('redirect_uri', redirect_uri);
     params.append('code', code);
 
@@ -25,6 +25,7 @@ app.post('/exchange-token', async (req, res) => {
             body: params
         });
         const data = await response.json();
+        console.log('OSM token response:', data); // <-- Add this line
         res.json(data);
     } catch (err) {
         console.error('Error in /exchange-token:', err);
