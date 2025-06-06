@@ -5,8 +5,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const oauthclientid = 'vifnubG1UFN63p8n3qK5wnOTHs5QQimP';   // <-- Replace with your actual API ID
-const oauthsecret = 'HOvO2kixyojDMOVGJaeM1TSDb9Rggez45fRe2gkxqRMUjgdzJOYp2Ce2yb9HMifM'; // <-- Replace with your actual API Token
+const oauthclientid = '98YWRWrOQyUVAlJuPHs8AdsbVg2mUCQO';   // <-- New OSM OAuth Client ID
+const oauthsecret = 'DwYXWqxsf7MlkNQE1dF0cRzrmdbjFdXqhwUER8270C99Y5CmNc5yx2l4OxU5QjNm'; // <-- New OSM OAuth Secret
 
 // Exchange code for access token
 app.post('/exchange-token', async (req, res) => {
