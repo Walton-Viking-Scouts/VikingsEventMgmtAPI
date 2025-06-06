@@ -2,7 +2,12 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://vikings-eventmgmt.onrender.com',
+    'https://localhost:3000'
+  ]
+}));
 app.use(express.json());
 
 const oauthclientid = '98YWRWrOQyUVAlJuPHs8AdsbVg2mUCQO';   // <-- New OSM OAuth Client ID
