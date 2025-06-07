@@ -18,10 +18,101 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-const oauthclientid = '98YWRWrOQyUVAlJuPHs8AdsbVg2mUCQO';   // <-- New OSM OAuth Client ID
-const oauthsecret = 'DwYXWqxsf7MlkNQE1dF0cRzrmdbjFdXqhwUER8270C99Y5CmNc5yx2l4OxU5QjNm'; // <-- New OSM OAuth Secret
+const oauthclientid = '98YWRWrOQyUVAlJuPHs8AdsbVg2mUCQO';
+const oauthsecret = 'DwYXWqxsf7MlkNQE1dF0cRzrmdbjFdXqhwUER8270C99Y5CmNc5yx2l4OxU5QjNm';
 
-// Exchange code for access token
+// Store tokens in memory (use Redis/DB in production)
+const userTokens = new Map();
+
+// OAuth callback endpoint
+app.post('/callback', async (req, res) => {
+    const { code } = req.body;
+    
+    if (!code) {
+        return res.status(400).json({ error: 'Authorization code required' });
+    }
+
+    try {
+        console.log('Processing OAuth callback...');
+        
+        const params = new URLSearchParams();
+        params.append('grant_type', 'authorization_code');
+        params.append('client_id', oauthclientid);
+        params.append('client_secret', oauthsecret);
+        params.append('redirect_uri', 'https://localhost:3000/callback.html');
+        params.append('code', code);
+
+        const response = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params
+        });
+
+        const tokenData = await response.json();
+        console.log('Token exchange result:', tokenData);
+
+        if (tokenData.access_token) {
+            const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            userTokens.set(sessionId, {
+                access_token: tokenData.access_token,
+                refresh_token: tokenData.refresh_token,
+                expires_at: Date.now() + (tokenData.expires_in * 1000)
+            });
+
+            res.cookie('session_id', sessionId, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'none', // Required for cross-origin cookies
+                maxAge: tokenData.expires_in * 1000
+            });
+
+            res.json({ success: true });
+        } else {
+            console.error('No access token received:', tokenData);
+            res.status(400).json({ error: 'Token exchange failed', details: tokenData });
+        }
+
+    } catch (error) {
+        console.error('OAuth callback error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Token endpoint - THIS WAS MISSING!
+app.get('/token', (req, res) => {
+    const sessionId = req.cookies?.session_id;
+    
+    if (!sessionId) {
+        return res.status(401).json({ error: 'No session found' });
+    }
+
+    const tokenData = userTokens.get(sessionId);
+    
+    if (!tokenData) {
+        return res.status(401).json({ error: 'Invalid session' });
+    }
+
+    // Check if token expired
+    if (Date.now() > tokenData.expires_at) {
+        userTokens.delete(sessionId);
+        return res.status(401).json({ error: 'Token expired' });
+    }
+
+    res.json({ access_token: tokenData.access_token });
+});
+
+// Logout endpoint
+app.post('/logout', (req, res) => {
+    const sessionId = req.cookies?.session_id;
+    if (sessionId) {
+        userTokens.delete(sessionId);
+    }
+    res.clearCookie('session_id');
+    res.json({ success: true });
+});
+
+// Exchange code for access token (existing endpoint)
 app.post('/exchange-token', async (req, res) => {
     const { code, redirect_uri } = req.body;
     const params = new URLSearchParams();
@@ -38,13 +129,15 @@ app.post('/exchange-token', async (req, res) => {
             body: params
         });
         const data = await response.json();
-        console.log('OSM token response:', data); // <-- Add this line
+        console.log('OSM token response:', data);
         res.json(data);
     } catch (err) {
         console.error('Error in /exchange-token:', err);
         res.status(500).json({ error: 'Internal Server Error', details: err.message });
     }
 });
+
+// ... rest of your existing endpoints (get-terms, get-section-config, etc.) ...
 
 // Proxy getTerms to avoid CORS
 app.post('/get-terms', async (req, res) => {
@@ -202,120 +295,19 @@ app.get('/get-list-of-members', async (req, res) => {
     }
 });
 
-app.listen(3001, () => {
-    console.log('Backend listening on http://localhost:3001');
-});
-
-// Add this endpoint after your existing routes:
-
-// OAuth callback endpoint
-app.post('/callback', async (req, res) => {
-    const { code } = req.body;
-    
-    if (!code) {
-        return res.status(400).json({ error: 'Authorization code required' });
-    }
-
-    try {
-        console.log('Processing OAuth callback with code:', code.substring(0, 20) + '...');
-        
-        // Exchange code for token
-        const params = new URLSearchParams();
-        params.append('grant_type', 'authorization_code');
-        params.append('client_id', oauthclientid);
-        params.append('client_secret', oauthsecret);
-        params.append('redirect_uri', 'https://localhost:3000/callback.html'); // Your callback URL
-        params.append('code', code);
-
-        const response = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OSM token exchange failed:', response.status, errorText);
-            return res.status(response.status).json({ 
-                error: 'Token exchange failed', 
-                details: errorText 
-            });
-        }
-
-        const tokenData = await response.json();
-        console.log('Token exchange successful');
-
-        if (tokenData.access_token) {
-            // Generate a session ID
-            const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            
-            // Store token with session ID
-            userTokens.set(sessionId, {
-                access_token: tokenData.access_token,
-                refresh_token: tokenData.refresh_token,
-                expires_at: Date.now() + (tokenData.expires_in * 1000)
-            });
-
-            // Set session cookie
-            res.cookie('session_id', sessionId, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: tokenData.expires_in * 1000
-            });
-
-            res.json({ 
-                success: true, 
-                message: 'Authentication successful' 
-            });
-        } else {
-            console.error('No access token in response:', tokenData);
-            res.status(400).json({ 
-                error: 'No access token received', 
-                details: tokenData 
-            });
-        }
-
-    } catch (error) {
-        console.error('OAuth callback error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error', 
-            details: error.message 
-        });
-    }
-});
-
-// Token endpoint to get current user's token
-app.get('/token', (req, res) => {
-    const sessionId = req.cookies?.session_id;
-    
-    if (!sessionId) {
-        return res.status(401).json({ error: 'No session found' });
-    }
-
-    const tokenData = userTokens.get(sessionId);
-    
-    if (!tokenData) {
-        return res.status(401).json({ error: 'Invalid session' });
-    }
-
-    // Check if token expired
-    if (Date.now() > tokenData.expires_at) {
-        userTokens.delete(sessionId);
-        return res.status(401).json({ error: 'Token expired' });
-    }
-
-    res.json({ access_token: tokenData.access_token });
-});
-
-// Logout endpoint
-app.post('/logout', (req, res) => {
-    const sessionId = req.cookies?.session_id;
-    
-    if (sessionId) {
-        userTokens.delete(sessionId);
-    }
-    
-    res.clearCookie('session_id');
-    res.json({ success: true, message: 'Logged out successfully' });
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+    console.log(`Backend listening on port ${PORT}`);
+    console.log('Available endpoints:');
+    console.log('- POST /callback (OAuth callback)');
+    console.log('- GET /token (Get current token)');
+    console.log('- POST /logout (Logout)');
+    console.log('- POST /exchange-token (Legacy)');
+    console.log('- POST /get-terms');
+    console.log('- POST /get-section-config');
+    console.log('- POST /get-user-roles');
+    console.log('- POST /get-events');
+    console.log('- POST /get-event-attendance');
+    console.log('- GET /get-contact-details');
+    console.log('- GET /get-list-of-members');
 });
