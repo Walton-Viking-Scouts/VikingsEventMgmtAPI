@@ -1,14 +1,22 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 const app = express();
+
+// CORS with credentials support
 app.use(cors({
   origin: [
     'https://vikings-eventmgmt.onrender.com',
-    'https://localhost:3000'
-  ]
+    'https://localhost:3000',
+    'http://localhost:3000',
+    'https://vikings-osm-event-manager.onrender.com'
+  ],
+  credentials: true  // IMPORTANT: This fixes the CORS error!
 }));
+
 app.use(express.json());
+app.use(cookieParser());
 
 const oauthclientid = '98YWRWrOQyUVAlJuPHs8AdsbVg2mUCQO';   // <-- New OSM OAuth Client ID
 const oauthsecret = 'DwYXWqxsf7MlkNQE1dF0cRzrmdbjFdXqhwUER8270C99Y5CmNc5yx2l4OxU5QjNm'; // <-- New OSM OAuth Secret
@@ -196,4 +204,118 @@ app.get('/get-list-of-members', async (req, res) => {
 
 app.listen(3001, () => {
     console.log('Backend listening on http://localhost:3001');
+});
+
+// Add this endpoint after your existing routes:
+
+// OAuth callback endpoint
+app.post('/callback', async (req, res) => {
+    const { code } = req.body;
+    
+    if (!code) {
+        return res.status(400).json({ error: 'Authorization code required' });
+    }
+
+    try {
+        console.log('Processing OAuth callback with code:', code.substring(0, 20) + '...');
+        
+        // Exchange code for token
+        const params = new URLSearchParams();
+        params.append('grant_type', 'authorization_code');
+        params.append('client_id', oauthclientid);
+        params.append('client_secret', oauthsecret);
+        params.append('redirect_uri', 'https://localhost:3000/callback.html'); // Your callback URL
+        params.append('code', code);
+
+        const response = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OSM token exchange failed:', response.status, errorText);
+            return res.status(response.status).json({ 
+                error: 'Token exchange failed', 
+                details: errorText 
+            });
+        }
+
+        const tokenData = await response.json();
+        console.log('Token exchange successful');
+
+        if (tokenData.access_token) {
+            // Generate a session ID
+            const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            // Store token with session ID
+            userTokens.set(sessionId, {
+                access_token: tokenData.access_token,
+                refresh_token: tokenData.refresh_token,
+                expires_at: Date.now() + (tokenData.expires_in * 1000)
+            });
+
+            // Set session cookie
+            res.cookie('session_id', sessionId, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: tokenData.expires_in * 1000
+            });
+
+            res.json({ 
+                success: true, 
+                message: 'Authentication successful' 
+            });
+        } else {
+            console.error('No access token in response:', tokenData);
+            res.status(400).json({ 
+                error: 'No access token received', 
+                details: tokenData 
+            });
+        }
+
+    } catch (error) {
+        console.error('OAuth callback error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error', 
+            details: error.message 
+        });
+    }
+});
+
+// Token endpoint to get current user's token
+app.get('/token', (req, res) => {
+    const sessionId = req.cookies?.session_id;
+    
+    if (!sessionId) {
+        return res.status(401).json({ error: 'No session found' });
+    }
+
+    const tokenData = userTokens.get(sessionId);
+    
+    if (!tokenData) {
+        return res.status(401).json({ error: 'Invalid session' });
+    }
+
+    // Check if token expired
+    if (Date.now() > tokenData.expires_at) {
+        userTokens.delete(sessionId);
+        return res.status(401).json({ error: 'Token expired' });
+    }
+
+    res.json({ access_token: tokenData.access_token });
+});
+
+// Logout endpoint
+app.post('/logout', (req, res) => {
+    const sessionId = req.cookies?.session_id;
+    
+    if (sessionId) {
+        userTokens.delete(sessionId);
+    }
+    
+    res.clearCookie('session_id');
+    res.json({ success: true, message: 'Logged out successfully' });
 });
