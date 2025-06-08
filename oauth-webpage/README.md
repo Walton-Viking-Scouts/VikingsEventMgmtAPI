@@ -2,6 +2,8 @@
 
 This project is a simple webpage that demonstrates how to authenticate with an API service using OAuth and make API calls.
 
+
+
 ## Project Structure
 
 ```

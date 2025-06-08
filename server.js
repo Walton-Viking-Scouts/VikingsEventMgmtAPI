@@ -137,8 +137,6 @@ app.post('/exchange-token', async (req, res) => {
     }
 });
 
-// ... rest of your existing endpoints (get-terms, get-section-config, etc.) ...
-
 // Proxy getTerms to avoid CORS
 app.post('/get-terms', async (req, res) => {
     const { access_token } = req.body;
