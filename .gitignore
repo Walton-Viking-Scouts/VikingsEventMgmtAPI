@@ -22,5 +22,8 @@ Thumbs.db
 # VS Code settings (optional)
 .vscode/
 
+# Test coverage
+coverage/
+
 # Front end build artifacts
 src/
