@@ -293,6 +293,28 @@ app.get('/get-list-of-members', async (req, res) => {
     }
 });
 
+// Proxy getFlexiRecords to avoid CORS
+app.post('/get-flexi-records', async (req, res) => {
+    const { sectionid, archived = 'n' } = req.body;
+    const access_token = req.headers.authorization?.replace('Bearer ', '');
+    if (!access_token || !sectionid) {
+        return res.status(400).json({ error: 'Missing access_token or sectionid' });
+    }
+    try {
+        const response = await fetch(`https://www.onlinescoutmanager.co.uk/api.php?action=getFlexiRecords&sectionid=${sectionid}&archived=${archived}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${access_token}`
+            }
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        console.error('Error in /get-flexi-records:', err);
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Backend listening on port ${PORT}`);
@@ -308,4 +330,5 @@ app.listen(PORT, () => {
     console.log('- POST /get-event-attendance');
     console.log('- GET /get-contact-details');
     console.log('- GET /get-list-of-members');
+    console.log('- POST /get-flexi-records');
 });
