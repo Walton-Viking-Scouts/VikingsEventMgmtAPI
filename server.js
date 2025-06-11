@@ -18,8 +18,8 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-const oauthclientid = '98YWRWrOQyUVAlJuPHs8AdsbVg2mUCQO';
-const oauthsecret = 'DwYXWqxsf7MlkNQE1dF0cRzrmdbjFdXqhwUER8270C99Y5CmNc5yx2l4OxU5QjNm';
+const oauthclientid = 'xnaUg7zxsrARZAHKMlshvREmY4GhDs7Z';
+const oauthsecret = 'wm24tggsYBl43emj7JB5qBq0tOTSHWTt8ay0W51KqmMSrSAMjCp3eRsO7XWlvWCS';
 
 // Store tokens in memory (use Redis/DB in production)
 const userTokens = new Map();
