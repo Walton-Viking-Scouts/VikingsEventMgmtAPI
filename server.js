@@ -345,7 +345,7 @@ app.get('/get-flexi-records', async (req, res) => {
         return res.status(400).json({ error: 'Missing access_token or sectionid' });
     }
     try {
-        const response = await fetch(`hhttps://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getFlexiRecords&sectionid=${sectionid}&archived=${archived}`, {
+        const response = await fetch(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getFlexiRecords&sectionid=${sectionid}&archived=${archived}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${access_token}`
@@ -366,6 +366,73 @@ app.get('/get-flexi-records', async (req, res) => {
     }
 });
 
+// Proxy getSingleFlexiRecord to avoid CORS
+app.post('/get-single-flexi-record', async (req, res) => {
+    const { access_token, flexirecordid, sectionid, termid } = req.body;
+    if (!access_token || !flexirecordid || !sectionid || !termid) {
+        return res.status(400).json({ error: 'Missing access_token, flexirecordid, sectionid, or termid' });
+    }
+    try {
+        const response = await fetch(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getData&extraid=${flexirecordid}&sectionid=${sectionid}&termid=${termid}&nototal`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${access_token}`
+            }
+        });
+        const text = await response.text();
+        console.log('Single FlexiRecord API response:', text.substring(0, 200)); // Log first 200 chars
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            return res.status(502).json({ error: 'Upstream returned non-JSON', details: text.substring(0, 500) });
+        }
+        res.json(data);
+    } catch (err) {
+        console.error('Error in /get-single-flexi-record:', err);
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    }
+});
+
+// Proxy updateFlexiRecord to avoid CORS
+app.post('/update-flexi-record', async (req, res) => {
+    const { access_token, termid, sectiontype, sectionid, extraid, scoutid, column, value } = req.body;
+    if (!access_token || !termid || !sectiontype || !sectionid || !extraid || !scoutid || !column || value === undefined) {
+        return res.status(400).json({ error: 'Missing required parameters: access_token, termid, sectiontype, sectionid, extraid, scoutid, column, or value' });
+    }
+    try {
+        const params = new URLSearchParams();
+        params.append('termid', termid);
+        params.append('section', sectiontype);
+        params.append('sectionid', sectionid);
+        params.append('extraid', extraid);
+        params.append('scoutid', scoutid);
+        params.append('column', column);
+        params.append('value', value);
+
+        const response = await fetch('https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateScout&nototal', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params
+        });
+        const text = await response.text();
+        console.log('Update FlexiRecord API response:', text.substring(0, 200)); // Log first 200 chars
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            return res.status(502).json({ error: 'Upstream returned non-JSON', details: text.substring(0, 500) });
+        }
+        res.json(data);
+    } catch (err) {
+        console.error('Error in /update-flexi-record:', err);
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Backend listening on port ${PORT}`);
@@ -382,4 +449,7 @@ app.listen(PORT, () => {
     console.log('- GET /get-contact-details');
     console.log('- GET /get-list-of-members');
     console.log('- GET /get-flexi-records');
+    console.log('- POST /get-single-flexi-record');
+    console.log('- POST /update-flexi-record');
+    console.log('- POST /update-flexi-record');
 });

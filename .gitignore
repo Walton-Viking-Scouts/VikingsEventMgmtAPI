@@ -24,6 +24,7 @@ Thumbs.db
 
 # Test coverage
 coverage/
+*.lcov
 
 # Front end build artifacts
 src/
