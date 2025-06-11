@@ -115,7 +115,11 @@ app.post('/logout', (req, res) => {
 // Exchange code for access token (existing endpoint)
 app.post('/exchange-token', async (req, res) => {
     const { code, redirect_uri } = req.body;
-    console.log('Exchange token request:', { code: code?.substring(0, 10) + '...', redirect_uri });
+    console.log('Exchange token request:', { 
+        code: code?.substring(0, 10) + '...', 
+        redirect_uri,
+        client_id: oauthclientid 
+    });
     
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
@@ -132,18 +136,26 @@ app.post('/exchange-token', async (req, res) => {
         });
         
         const text = await response.text();
-        console.log('OSM token response status:', response.status);
-        console.log('OSM token response text:', text.substring(0, 200));
+        console.log('OSM OAuth response status:', response.status);
+        console.log('OSM OAuth response (first 500 chars):', text.substring(0, 500));
+        
+        if (text.startsWith('<!doctype') || text.startsWith('<html')) {
+            console.error('Received HTML instead of JSON - likely OAuth error');
+            return res.status(502).json({ 
+                error: 'OAuth server returned HTML error page', 
+                details: 'Check client_id, client_secret, and redirect_uri',
+                html_preview: text.substring(0, 200)
+            });
+        }
         
         let data;
         try {
             data = JSON.parse(text);
         } catch (e) {
-            console.error('Failed to parse JSON response:', text.substring(0, 500));
+            console.error('Failed to parse OAuth response as JSON');
             return res.status(502).json({ 
-                error: 'Upstream returned non-JSON', 
-                details: text.substring(0, 500),
-                status: response.status
+                error: 'Invalid JSON from OAuth server', 
+                details: text.substring(0, 500)
             });
         }
         
