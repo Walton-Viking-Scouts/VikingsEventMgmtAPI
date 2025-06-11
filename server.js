@@ -294,8 +294,8 @@ app.get('/get-list-of-members', async (req, res) => {
 });
 
 // Proxy getFlexiRecords to avoid CORS
-app.post('/get-flexi-records', async (req, res) => {
-    const { sectionid, archived = 'n' } = req.body;
+app.get('/get-flexi-records', async (req, res) => {
+    const { sectionid, archived = 'n' } = req.query;
     const access_token = req.headers.authorization?.replace('Bearer ', '');
     if (!access_token || !sectionid) {
         return res.status(400).json({ error: 'Missing access_token or sectionid' });
@@ -307,7 +307,14 @@ app.post('/get-flexi-records', async (req, res) => {
                 'Authorization': `Bearer ${access_token}`
             }
         });
-        const data = await response.json();
+        const text = await response.text();
+        console.log('FlexiRecords API response:', text.substring(0, 200)); // Log first 200 chars
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            return res.status(502).json({ error: 'Upstream returned non-JSON', details: text.substring(0, 500) });
+        }
         res.json(data);
     } catch (err) {
         console.error('Error in /get-flexi-records:', err);
@@ -330,5 +337,5 @@ app.listen(PORT, () => {
     console.log('- POST /get-event-attendance');
     console.log('- GET /get-contact-details');
     console.log('- GET /get-list-of-members');
-    console.log('- POST /get-flexi-records');
+    console.log('- GET /get-flexi-records');
 });
