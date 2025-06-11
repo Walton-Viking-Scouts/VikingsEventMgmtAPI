@@ -345,7 +345,7 @@ app.get('/get-flexi-records', async (req, res) => {
         return res.status(400).json({ error: 'Missing access_token or sectionid' });
     }
     try {
-        const response = await fetch(`https://www.onlinescoutmanager.co.uk/api.php?action=getFlexiRecords&sectionid=${sectionid}&archived=${archived}`, {
+        const response = await fetch(`hhttps://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getFlexiRecords&sectionid=${sectionid}&archived=${archived}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${access_token}`
