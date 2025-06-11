@@ -115,6 +115,8 @@ app.post('/logout', (req, res) => {
 // Exchange code for access token (existing endpoint)
 app.post('/exchange-token', async (req, res) => {
     const { code, redirect_uri } = req.body;
+    console.log('Exchange token request:', { code: code?.substring(0, 10) + '...', redirect_uri });
+    
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
     params.append('client_id', oauthclientid);
@@ -128,7 +130,23 @@ app.post('/exchange-token', async (req, res) => {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params
         });
-        const data = await response.json();
+        
+        const text = await response.text();
+        console.log('OSM token response status:', response.status);
+        console.log('OSM token response text:', text.substring(0, 200));
+        
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('Failed to parse JSON response:', text.substring(0, 500));
+            return res.status(502).json({ 
+                error: 'Upstream returned non-JSON', 
+                details: text.substring(0, 500),
+                status: response.status
+            });
+        }
+        
         console.log('OSM token response:', data);
         res.json(data);
     } catch (err) {
