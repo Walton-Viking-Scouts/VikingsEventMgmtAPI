@@ -26,7 +26,7 @@ const userTokens = new Map();
 
 // OAuth callback endpoint
 app.post('/callback', async (req, res) => {
-    const { code } = req.body;
+    const { code, redirect_uri } = req.body;
     
     if (!code) {
         return res.status(400).json({ error: 'Authorization code required' });
@@ -39,7 +39,7 @@ app.post('/callback', async (req, res) => {
         params.append('grant_type', 'authorization_code');
         params.append('client_id', oauthclientid);
         params.append('client_secret', oauthsecret);
-        params.append('redirect_uri', 'https://localhost:3000/callback.html');
+        params.append('redirect_uri', redirect_uri || 'https://vikings-eventmgmt.onrender.com/callback.html');
         params.append('code', code);
 
         const response = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
@@ -48,7 +48,21 @@ app.post('/callback', async (req, res) => {
             body: params
         });
 
-        const tokenData = await response.json();
+        const text = await response.text();
+        console.log('Callback OAuth response status:', response.status);
+        console.log('Callback OAuth response (first 200 chars):', text.substring(0, 200));
+
+        let tokenData;
+        try {
+            tokenData = JSON.parse(text);
+        } catch (e) {
+            console.error('Failed to parse OAuth response as JSON:', text.substring(0, 500));
+            return res.status(502).json({ 
+                error: 'OAuth server returned non-JSON', 
+                details: text.substring(0, 500)
+            });
+        }
+
         console.log('Token exchange result:', tokenData);
 
         if (tokenData.access_token) {
