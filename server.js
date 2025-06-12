@@ -284,8 +284,8 @@ const addRateLimitInfoToResponse = (req, res, data) => {
     return response;
 };
 
-const oauthclientid = 'xnaUg7zxsrARZAHKMlshvREmY4GhDs7Z';
-const oauthsecret = 'wm24tggsYBl43emj7JB5qBq0tOTSHWTt8ay0W51KqmMSrSAMjCp3eRsO7XWlvWCS';
+const oauthclientid = 'x7hx1M0NExVdSiksH1gUBPxkSTn8besx';
+const oauthsecret = 'u1hCuA4W8s7C0qiiVw9ZygY7CLXLYOzhDKpDbwRt7f7JZHIinjZrcj6quf7yH3zE';
 
 // Store tokens in memory (use Redis/DB in production)
 const userTokens = new Map();
@@ -395,11 +395,29 @@ app.post('/logout', (req, res) => {
 // Exchange code for access token (existing endpoint)
 app.post('/exchange-token', async (req, res) => {
     const { code, redirect_uri } = req.body;
-    console.log('Exchange token request:', { 
-        code: code?.substring(0, 10) + '...', 
-        redirect_uri,
-        client_id: oauthclientid 
+    
+    // Enhanced logging for debugging
+    console.log('=== OAuth Token Exchange Debug ===');
+    console.log('Request body:', { 
+        code: code ? `${code.substring(0, 10)}...` : 'MISSING', 
+        redirect_uri: redirect_uri || 'MISSING',
+        code_length: code ? code.length : 0
     });
+    console.log('OAuth Config:', { 
+        client_id: oauthclientid,
+        client_secret: oauthsecret ? `${oauthsecret.substring(0, 10)}...` : 'MISSING',
+        redirect_uri_param: redirect_uri
+    });
+    
+    if (!code) {
+        console.error('ERROR: Missing authorization code');
+        return res.status(400).json({ error: 'Missing authorization code' });
+    }
+    
+    if (!redirect_uri) {
+        console.error('ERROR: Missing redirect_uri');
+        return res.status(400).json({ error: 'Missing redirect_uri' });
+    }
     
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
@@ -407,6 +425,13 @@ app.post('/exchange-token', async (req, res) => {
     params.append('client_secret', oauthsecret);
     params.append('redirect_uri', redirect_uri);
     params.append('code', code);
+    
+    console.log('Request parameters being sent to OSM:');
+    console.log('- grant_type:', 'authorization_code');
+    console.log('- client_id:', oauthclientid);
+    console.log('- client_secret:', oauthsecret ? '[PRESENT]' : '[MISSING]');
+    console.log('- redirect_uri:', redirect_uri);
+    console.log('- code:', code ? `${code.substring(0, 15)}...` : '[MISSING]');
 
     try {
         const response = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
@@ -417,6 +442,7 @@ app.post('/exchange-token', async (req, res) => {
         
         const text = await response.text();
         console.log('OSM OAuth response status:', response.status);
+        console.log('OSM OAuth response headers:', Object.fromEntries(response.headers.entries()));
         console.log('OSM OAuth response (first 500 chars):', text.substring(0, 500));
         
         if (text.startsWith('<!doctype') || text.startsWith('<html')) {
@@ -439,7 +465,33 @@ app.post('/exchange-token', async (req, res) => {
             });
         }
         
-        console.log('OSM token response:', data);
+        console.log('Parsed OSM token response:', data);
+        
+        // Check for OAuth errors
+        if (data.error) {
+            console.error('=== OAuth Error Details ===');
+            console.error('Error:', data.error);
+            console.error('Description:', data.error_description);
+            console.error('Hint:', data.hint);
+            console.error('Message:', data.message);
+            console.error('========================');
+            
+            // Return detailed error for debugging
+            return res.status(400).json({
+                error: 'OAuth Error',
+                oauth_error: data.error,
+                description: data.error_description,
+                hint: data.hint,
+                message: data.message,
+                debug_info: {
+                    client_id: oauthclientid,
+                    redirect_uri: redirect_uri,
+                    code_provided: !!code,
+                    code_length: code ? code.length : 0
+                }
+            });
+        }
+        
         res.json(data);
     } catch (err) {
         console.error('Error in /exchange-token:', err);
