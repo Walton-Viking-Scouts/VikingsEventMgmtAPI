@@ -861,22 +861,29 @@ app.post('/update-flexi-record', backendRateLimit, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`Backend listening on port ${PORT}`);
-    console.log('Available endpoints:');
-    console.log('- POST /callback (OAuth callback)');
-    console.log('- GET /token (Get current token)');
-    console.log('- POST /logout (Logout)');
-    console.log('- GET /rate-limit-status (Rate limit monitoring)');
-    console.log('- POST /exchange-token (Legacy)');
-    console.log('- POST /get-terms');
-    console.log('- POST /get-section-config');
-    console.log('- POST /get-user-roles');
-    console.log('- POST /get-events');
-    console.log('- POST /get-event-attendance');
-    console.log('- GET /get-contact-details');
-    console.log('- GET /get-list-of-members');
-    console.log('- GET /get-flexi-records');
-    console.log('- POST /get-single-flexi-record');
-    console.log('- POST /update-flexi-record');
-});
+
+// Export the app for testing purposes
+module.exports = app;
+
+// Start the server only if this script is run directly
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Backend listening on port ${PORT}`);
+        console.log('Available endpoints:');
+        console.log('- POST /callback (OAuth callback)');
+        console.log('- GET /token (Get current token)');
+        console.log('- POST /logout (Logout)');
+        console.log('- GET /rate-limit-status (Rate limit monitoring)');
+        console.log('- POST /exchange-token (Legacy)');
+        console.log('- POST /get-terms');
+        console.log('- POST /get-section-config');
+        console.log('- POST /get-user-roles');
+        console.log('- POST /get-events');
+        console.log('- POST /get-event-attendance');
+        console.log('- GET /get-contact-details');
+        console.log('- GET /get-list-of-members');
+        console.log('- GET /get-flexi-records');
+        console.log('- POST /get-single-flexi-record');
+        console.log('- POST /update-flexi-record');
+    });
+}
