@@ -3,50 +3,27 @@ const request = require('supertest');
 // Mock fetch for all integration tests
 global.fetch = jest.fn();
 
+// Import the Express app from server.js
+const app = require('./server'); // Assuming server.js is in the same directory (root)
+
 describe('Integration Tests', () => {
-  let app;
+  // let app; // App is now imported
   let server;
 
   beforeAll(async () => {
-    // Import the actual server
+    // Mock 'node:fs' if server.js uses it at the top level.
+    // Based on server.js content, it's not used at the top level, so this mock might be removable
+    // unless there's a file read during initial module load I missed.
+    // For now, keeping it to be safe, but can be revisited if it causes issues.
     jest.mock('node:fs', () => ({
       readFileSync: jest.fn()
     }));
     
-    // Set up a test version of the server
-    const express = require('express');
-    const cors = require('cors');
-    const cookieParser = require('cookie-parser');
-    
-    app = express();
-    app.use(cors());
-    app.use(express.json());
-    app.use(cookieParser());
+    // The app is already configured and includes all middleware and routes from server.js.
+    // No need to redefine express(), cors(), cookieParser(), or any routes here.
 
-    // Add actual route handlers (you can copy from server.js)
-    app.post('/get-user-roles', async (req, res) => {
-      const { access_token } = req.body;
-      if (!access_token) {
-        return res.status(400).json({ error: 'No access token provided' });
-      }
-      
-      fetch.mockResolvedValueOnce({
-        json: async () => ([
-          { sectionid: "11107", sectionname: "Adults" },
-          { sectionid: "49097", sectionname: "Thursday Beavers" }
-        ])
-      });
-
-      try {
-        const response = await fetch('https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles');
-        const data = await response.json();
-        res.json(data);
-      } catch (err) {
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    server = app.listen(0); // Use port 0 for testing
+    // Start the server on a random available port for testing
+    server = app.listen(0);
   });
 
   afterAll(async () => {
@@ -59,17 +36,33 @@ describe('Integration Tests', () => {
     jest.clearAllMocks();
   });
 
-  describe('Full API Flow', () => {
+  describe('Full API Flow', () => { // This test will be moved or updated later to fit new structure
     it('should handle a complete user roles request', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ([ // OSM returns an array for getUserRoles
+          { sectionid: "11107", sectionname: "Adults" },
+          { sectionid: "49097", sectionname: "Thursday Beavers" }
+        ]),
+        headers: new Map() // For rate limit header extraction in makeOSMRequest
+      });
+
       const response = await request(app)
         .post('/get-user-roles')
         .send({ access_token: 'test_token' })
         .expect(200);
 
-      expect(response.body).toEqual([
-        { sectionid: "11107", sectionname: "Adults" },
-        { sectionid: "49097", sectionname: "Thursday Beavers" }
-      ]);
+      // server.js wraps array responses by merging properties, plus _rateLimitInfo
+      expect(response.body).toHaveProperty('_rateLimitInfo');
+      expect(response.body[0]).toEqual({ sectionid: "11107", sectionname: "Adults" });
+      expect(response.body[1]).toEqual({ sectionid: "49097", sectionname: "Thursday Beavers" });
+
+      expect(fetch).toHaveBeenCalledWith(
+        'https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles',
+        expect.objectContaining({
+          headers: { 'Authorization': `Bearer test_token` }
+        })
+      );
     });
   });
 });
