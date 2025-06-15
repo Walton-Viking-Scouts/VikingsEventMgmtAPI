@@ -1,34 +1,38 @@
 {
-  "name": "osm-tracker-backend",
+  "name": "vikings-osm-backend",
   "version": "1.0.0",
-  "description": "OSM Tracker Backend API",
+  "description": "Backend API for Vikings OSM Event Manager with rate limiting and OAuth",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false"
+    "dev": "nodemon server.js",
+    "test": "NODE_ENV=test jest",
+    "test:watch": "NODE_ENV=test jest --watch",
+    "test:coverage": "NODE_ENV=test jest --coverage",
+    "test:ci": "NODE_ENV=test jest --ci --coverage --watchAll=false"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "setupFilesAfterEnv": [
-      "./jest.setup.js"
-    ],
-    "collectCoverageFrom": [
-      "*.js",
-      "!node_modules/**",
-      "!jest.setup.js",
-      "!*.test.js"
-    ]
-  },
+  "keywords": [
+    "osm",
+    "onlinescoutmanager",
+    "api",
+    "backend",
+    "oauth",
+    "rate-limiting"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "supertest": "^6.3.4"
+    "nodemon": "^3.0.1",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }

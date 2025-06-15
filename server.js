@@ -872,7 +872,7 @@ app.post('/update-flexi-record', backendRateLimit, async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 
-// Export the app for testing purposes
+// Export the app for testing
 module.exports = app;
 
 // Start the server only if this script is run directly
