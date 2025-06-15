@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
+// Load environment variables
+require('dotenv').config();
+
 const app = express();
 
 // Rate limiting tracking for our backend
@@ -284,8 +287,15 @@ const addRateLimitInfoToResponse = (req, res, data) => {
     return response;
 };
 
-const oauthclientid = 'x7hx1M0NExVdSiksH1gUBPxkSTn8besx';
-const oauthsecret = 'u1hCuA4W8s7C0qiiVw9ZygY7CLXLYOzhDKpDbwRt7f7JZHIinjZrcj6quf7yH3zE';
+// OAuth configuration from environment variables
+const oauthclientid = process.env.OAUTH_CLIENT_ID || 'x7hx1M0NExVdSiksH1gUBPxkSTn8besx';
+const oauthsecret = process.env.OAUTH_CLIENT_SECRET || 'u1hCuA4W8s7C0qiiVw9ZygY7CLXLYOzhDKpDbwRt7f7JZHIinjZrcj6quf7yH3zE';
+
+// Validate OAuth configuration
+if (!process.env.OAUTH_CLIENT_ID || !process.env.OAUTH_CLIENT_SECRET) {
+    console.warn('⚠️  WARNING: OAuth credentials not found in environment variables!');
+    console.warn('⚠️  Set OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET environment variables');
+}
 
 // Store tokens in memory (use Redis/DB in production)
 const userTokens = new Map();
