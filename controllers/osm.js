@@ -187,7 +187,7 @@ const getEvents = async (req, res) => {
 
 // Proxy getEventAttendance to avoid CORS
 const getEventAttendance = async (req, res) => {
-    const { access_token, sectionid, eventid } = req.body;
+    const { access_token, sectionid, eventid } = req.query;
     const sessionId = getSessionId(req);
     if (!access_token || !sectionid || !eventid) {
         return res.status(400).json({ error: 'Missing parameters' });
@@ -391,14 +391,14 @@ const getFlexiStructure = async (req, res) => {
 
 // Proxy getSingleFlexiRecord to avoid CORS
 const getSingleFlexiRecord = async (req, res) => {
-    const { sectionid, scoutid, flexirecordid } = req.query;
+    const { flexirecordid, sectionid, termid } = req.query;
     const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
-    if (!access_token || !sectionid || !scoutid || !flexirecordid) {
+    if (!access_token || !sectionid || !sectionid || !termid) {
         return res.status(400).json({ error: 'Missing access_token, sectionid, scoutid, or flexirecordid' });
     }
     try {
-        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getSingleRecord&sectionid=${sectionid}&scoutid=${scoutid}&extraid=${flexirecordid}`, {
+        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getData&extraid=${flexirecordid}&sectionid=${sectionid}&termid=${termid}&nototal`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${access_token}`

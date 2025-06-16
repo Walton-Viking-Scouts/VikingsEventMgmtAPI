@@ -53,7 +53,7 @@ app.post('/get-terms', backendRateLimit, osmController.getTerms);
 app.post('/get-section-config', backendRateLimit, osmController.getSectionConfig);
 app.post('/get-user-roles', backendRateLimit, osmController.getUserRoles);
 app.post('/get-events', backendRateLimit, osmController.getEvents);
-app.post('/get-event-attendance', backendRateLimit, osmController.getEventAttendance);
+app.get('/get-event-attendance', backendRateLimit, osmController.getEventAttendance);
 app.get('/get-contact-details', backendRateLimit, osmController.getContactDetails);
 app.get('/get-list-of-members', backendRateLimit, osmController.getListOfMembers);
 app.get('/get-flexi-records', backendRateLimit, osmController.getFlexiRecords);
@@ -111,7 +111,7 @@ if (process.env.NODE_ENV !== 'test') {
         console.log('- POST /get-section-config');
         console.log('- POST /get-user-roles');
         console.log('- POST /get-events');
-        console.log('- POST /get-event-attendance');
+        console.log('- GET /get-event-attendance');
         console.log('- GET /get-contact-details');
         console.log('- GET /get-list-of-members');
         console.log('- GET /get-flexi-records');
