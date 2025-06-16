@@ -5,7 +5,55 @@ const cookieParser = require('cookie-parser');
 // Load environment variables
 require('dotenv').config();
 
+// Initialize Sentry BEFORE other imports
+const Sentry = require('@sentry/node');
+const { ProfilingIntegration } = require('@sentry/profiling-node');
+
+// Initialize Sentry
+if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: process.env.NODE_ENV || 'development',
+        integrations: [
+            // Enable HTTP call tracing
+            new Sentry.Integrations.Http({ tracing: true }),
+            // Enable Express.js middleware tracing
+            new Sentry.Integrations.Express({ app: express() }),
+            // Enable performance profiling
+            new ProfilingIntegration(),
+        ],
+        // Performance Monitoring
+        tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+        // Profiling sample rate
+        profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+        // Enhanced error context
+        beforeSend(event, hint) {
+            // Add custom context for OSM API errors
+            if (event.tags && event.tags.section === 'osm-api') {
+                event.contexts = {
+                    ...event.contexts,
+                    osm: {
+                        rate_limit_info: event.extra?.rateLimitInfo || null,
+                        endpoint: event.extra?.endpoint || null,
+                    }
+                };
+            }
+            return event;
+        }
+    });
+    
+    console.log('✅ Sentry initialized for error monitoring');
+} else {
+    console.log('⚠️  Sentry not initialized (missing SENTRY_DSN or test environment)');
+}
+
 const app = express();
+
+// Sentry request handler (must be first middleware)
+if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
+    app.use(Sentry.Handlers.requestHandler());
+    app.use(Sentry.Handlers.tracingHandler());
+}
 
 // Rate limiting tracking for our backend
 const rateLimitTracker = new Map();
@@ -873,6 +921,31 @@ app.post('/update-flexi-record', backendRateLimit, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Sentry error handler (must be after all other middleware and routes)
+if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
+    app.use(Sentry.Handlers.errorHandler({
+        shouldHandleError(error) {
+            // Capture all 4xx and 5xx errors
+            return error.status >= 400;
+        }
+    }));
+}
+
+// Global error handler (fallback)
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    
+    // Log to Sentry if available
+    if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
+        Sentry.captureException(err);
+    }
+    
+    res.status(500).json({ 
+        error: 'Internal Server Error',
+        message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+    });
+});
 
 // Export the app for testing
 module.exports = app;
