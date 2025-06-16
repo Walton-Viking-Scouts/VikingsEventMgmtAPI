@@ -109,6 +109,16 @@ describe('Vikings OSM Backend API', () => {
       expect(response.body.error).toContain('access_token');
     });
 
+    test('GET /get-flexi-structure should require access token, sectionid, and flexirecordid', async () => {
+      const response = await request(app)
+        .get('/get-flexi-structure')
+        .query({})
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('flexirecordid');
+    });
+
     test('OAuth callback should require authorization code', async () => {
       const response = await request(app)
         .post('/callback')

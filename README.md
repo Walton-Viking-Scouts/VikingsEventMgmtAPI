@@ -107,7 +107,8 @@ npm run test:ci       # CI mode (no watch, with coverage)
 - `GET /get-contact-details` - Get contact details
 - `GET /get-list-of-members` - Get list of members
 - `GET /get-flexi-records` - Get flexi records
-- `POST /get-single-flexi-record` - Get single flexi record
+- `GET /get-flexi-structure` - Get flexi record structure
+- `GET /get-single-flexi-record` - Get single flexi record
 - `POST /update-flexi-record` - Update flexi record
 
 ## Rate Limiting
