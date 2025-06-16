@@ -55,7 +55,7 @@ const getRateLimitStatus = (req, res) => {
 
 // Proxy getTerms to avoid CORS
 const getTerms = async (req, res) => {
-    const { access_token } = req.body;
+    const { access_token } = req.query;
     const sessionId = getSessionId(req);
     if (!access_token) {
         return res.status(400).json({ error: 'No access token provided' });
@@ -88,7 +88,7 @@ const getTerms = async (req, res) => {
 
 // Proxy getSectionConfig to avoid CORS
 const getSectionConfig = async (req, res) => {
-    const { access_token, sectionid } = req.body;
+    const { access_token, sectionid } = req.query;
     const sessionId = getSessionId(req);
     if (!access_token || !sectionid) {
         return res.status(400).json({ error: 'Missing access_token or sectionid' });
@@ -121,7 +121,7 @@ const getSectionConfig = async (req, res) => {
 
 // Proxy getUserRoles to avoid CORS
 const getUserRoles = async (req, res) => {
-    const { access_token } = req.body;
+    const { access_token } = req.query;
     const sessionId = getSessionId(req);
     if (!access_token) {
         return res.status(400).json({ error: 'No access token provided' });
@@ -154,7 +154,7 @@ const getUserRoles = async (req, res) => {
 
 // Proxy getEvents to avoid CORS
 const getEvents = async (req, res) => {
-    const { access_token, sectionid, termid } = req.body;
+    const { access_token, sectionid, termid } = req.query;
     const sessionId = getSessionId(req);
     if (!access_token || !sectionid || !termid) {
         return res.status(400).json({ error: 'Missing parameters' });

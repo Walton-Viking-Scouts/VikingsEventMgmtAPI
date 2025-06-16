@@ -49,10 +49,10 @@ app.post('/logout', authController.logout);
 app.post('/exchange-token', authController.exchangeToken); // Legacy endpoint
 
 // OSM API proxy endpoints (with rate limiting)
-app.post('/get-terms', backendRateLimit, osmController.getTerms);
-app.post('/get-section-config', backendRateLimit, osmController.getSectionConfig);
-app.post('/get-user-roles', backendRateLimit, osmController.getUserRoles);
-app.post('/get-events', backendRateLimit, osmController.getEvents);
+app.get('/get-terms', backendRateLimit, osmController.getTerms); // Updated to GET
+app.get('/get-section-config', backendRateLimit, osmController.getSectionConfig); // Updated to GET
+app.get('/get-user-roles', backendRateLimit, osmController.getUserRoles); // Updated to GET
+app.get('/get-events', backendRateLimit, osmController.getEvents); // Updated to GET
 app.get('/get-event-attendance', backendRateLimit, osmController.getEventAttendance);
 app.get('/get-contact-details', backendRateLimit, osmController.getContactDetails);
 app.get('/get-list-of-members', backendRateLimit, osmController.getListOfMembers);
@@ -107,10 +107,10 @@ if (process.env.NODE_ENV !== 'test') {
         console.log('Rate Monitoring:');
         console.log('- GET /rate-limit-status');
         console.log('OSM API Proxy:');
-        console.log('- POST /get-terms');
-        console.log('- POST /get-section-config');
-        console.log('- POST /get-user-roles');
-        console.log('- POST /get-events');
+        console.log('- GET /get-terms');
+        console.log('- GET /get-section-config');
+        console.log('- GET /get-user-roles');
+        console.log('- GET /get-events');
         console.log('- GET /get-event-attendance');
         console.log('- GET /get-contact-details');
         console.log('- GET /get-list-of-members');
