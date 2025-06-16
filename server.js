@@ -288,13 +288,15 @@ const addRateLimitInfoToResponse = (req, res, data) => {
 };
 
 // OAuth configuration from environment variables
-const oauthclientid = process.env.OAUTH_CLIENT_ID || 'x7hx1M0NExVdSiksH1gUBPxkSTn8besx';
-const oauthsecret = process.env.OAUTH_CLIENT_SECRET || 'u1hCuA4W8s7C0qiiVw9ZygY7CLXLYOzhDKpDbwRt7f7JZHIinjZrcj6quf7yH3zE';
+const oauthclientid = process.env.OAUTH_CLIENT_ID;
+const oauthsecret = process.env.OAUTH_CLIENT_SECRET;
 
 // Validate OAuth configuration
-if (!process.env.OAUTH_CLIENT_ID || !process.env.OAUTH_CLIENT_SECRET) {
-    console.warn('⚠️  WARNING: OAuth credentials not found in environment variables!');
-    console.warn('⚠️  Set OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET environment variables');
+if (!oauthclientid || !oauthsecret) {
+    console.error('❌ CRITICAL: OAuth credentials not found in environment variables!');
+    console.error('❌ Set OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET environment variables');
+    console.error('❌ Server cannot start without OAuth credentials');
+    process.exit(1);
 }
 
 // Store tokens in memory (use Redis/DB in production)

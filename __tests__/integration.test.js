@@ -1,6 +1,10 @@
 const request = require('supertest');
 require('dotenv').config();
 
+// Set test OAuth credentials BEFORE importing server
+process.env.OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || 'test_client_id';
+process.env.OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || 'test_client_secret';
+
 // Mock setInterval BEFORE importing server to prevent cleanup timers
 const originalSetInterval = global.setInterval;
 global.setInterval = jest.fn();
