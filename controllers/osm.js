@@ -128,9 +128,10 @@ const getUserRoles = async (req, res) => {
     }
     try {
         const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles', {
-            method: 'GET',
+            method: 'POST',
             headers: {
-                'Authorization': `Bearer ${access_token}`
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
             }
         }, sessionId);
         
