@@ -155,18 +155,26 @@ const getUserRoles = async (req, res) => {
     }
 };
 
-// Proxy getEvents to avoid CORS
+// Update getEvents function to use Authorization header
 const getEvents = async (req, res) => {
-    const { access_token, sectionid, termid } = req.query;
+    const { sectionid, termid } = req.query;
+    const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
-    if (!access_token || !sectionid || !termid) {
-        return res.status(400).json({ error: 'Missing parameters' });
+    
+    if (!access_token) {
+        return res.status(401).json({ error: 'Access token is required in Authorization header' });
     }
+    
+    if (!sectionid || !termid) {
+        return res.status(400).json({ error: 'sectionid and termid are required' });
+    }
+
     try {
-        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/events/summary/?action=get&sectionid=${sectionid}&termid=${termid}`, {
-            method: 'GET',
+        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/api.php?action=getEvents&sectionid=${sectionid}&termid=${termid}`, {
+            method: 'POST',
             headers: {
-                'Authorization': `Bearer ${access_token}`
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
             }
         }, sessionId);
         
@@ -187,6 +195,13 @@ const getEvents = async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error', details: err.message });
     }
 };
+
+// Debug the getEvents endpoint to understand the 400 error
+// Check what parameters and headers are required
+// Common issues:
+// - Missing Authorization header
+// - Missing required query parameters
+// - Incorrect parameter validation
 
 // Proxy getEventAttendance to avoid CORS
 const getEventAttendance = async (req, res) => {
