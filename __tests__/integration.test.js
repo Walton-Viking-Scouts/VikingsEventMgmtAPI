@@ -53,7 +53,7 @@ describe('Integration Tests', () => {
 
       const response = await request(app)
         .get('/get-user-roles')
-        .query({ access_token: 'test_token' })
+        .set('Authorization', 'Bearer test_token')
         .expect(200);
 
       expect(response.body).toHaveProperty('_rateLimitInfo');
