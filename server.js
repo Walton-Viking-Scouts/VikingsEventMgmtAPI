@@ -34,6 +34,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(backendRateLimit); // Apply rate limiting middleware to all routes
 
 // ========================================
 // ROUTES - Using imported controllers
@@ -49,17 +50,17 @@ app.post('/logout', authController.logout);
 app.post('/exchange-token', authController.exchangeToken); // Legacy endpoint
 
 // OSM API proxy endpoints (with rate limiting)
-app.get('/get-terms', backendRateLimit, osmController.getTerms); // Updated to GET
-app.get('/get-section-config', backendRateLimit, osmController.getSectionConfig); // Updated to GET
-app.get('/get-user-roles', backendRateLimit, osmController.getUserRoles); // Updated to GET
-app.get('/get-events', backendRateLimit, osmController.getEvents); // Updated to GET
-app.get('/get-event-attendance', backendRateLimit, osmController.getEventAttendance);
-app.get('/get-contact-details', backendRateLimit, osmController.getContactDetails);
-app.get('/get-list-of-members', backendRateLimit, osmController.getListOfMembers);
-app.get('/get-flexi-records', backendRateLimit, osmController.getFlexiRecords);
-app.get('/get-flexi-structure', backendRateLimit, osmController.getFlexiStructure);
-app.get('/get-single-flexi-record', backendRateLimit, osmController.getSingleFlexiRecord);
-app.post('/update-flexi-record', backendRateLimit, osmController.updateFlexiRecord);
+app.get('/get-terms', osmController.getTerms); // Updated to GET
+app.get('/get-section-config', osmController.getSectionConfig); // Updated to GET
+app.get('/get-user-roles', osmController.getUserRoles); // Updated to GET
+app.get('/get-events', osmController.getEvents); // Updated to GET
+app.get('/get-event-attendance', osmController.getEventAttendance);
+app.get('/get-contact-details', osmController.getContactDetails);
+app.get('/get-list-of-members', osmController.getListOfMembers);
+app.get('/get-flexi-records', osmController.getFlexiRecords);
+app.get('/get-flexi-structure', osmController.getFlexiStructure);
+app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
+app.post('/update-flexi-record', osmController.updateFlexiRecord);
 
 // ========================================
 // ERROR HANDLING

@@ -30,43 +30,51 @@ setInterval(() => {
 // Backend rate limiting middleware
 const backendRateLimit = (req, res, next) => {
     const sessionId = req.cookies?.session_id || req.ip;
-    const now = Date.now();
-    
+
+    // Ensure rateLimitTracker is initialized for the sessionId
     if (!rateLimitTracker.has(sessionId)) {
         rateLimitTracker.set(sessionId, { requests: [] });
     }
-    
+
     const userLimits = rateLimitTracker.get(sessionId);
-    
-    // Clean old requests outside the window
-    userLimits.requests = userLimits.requests.filter(timestamp => 
-        now - timestamp < BACKEND_RATE_LIMIT_WINDOW
-    );
-    
-    // Check if limit exceeded
+    const now = Date.now();
+
+    // Validate userLimits and requests array
+    if (!userLimits || !Array.isArray(userLimits.requests)) {
+        userLimits.requests = [];
+    }
+
+    // Clean up old requests outside the rate limit window
+    userLimits.requests = userLimits.requests.filter(timestamp => now - timestamp < BACKEND_RATE_LIMIT_WINDOW);
+
+    // Calculate remaining requests and reset time
+    const remaining = MAX_REQUESTS_PER_WINDOW - userLimits.requests.length;
+    const resetTime = userLimits.requests.length > 0
+        ? Math.ceil((userLimits.requests[0] + BACKEND_RATE_LIMIT_WINDOW) / 1000)
+        : Math.ceil((Date.now() + BACKEND_RATE_LIMIT_WINDOW) / 1000);
+
+    // Ensure rate limit headers are always set
+    res.set({
+        'x-backend-ratelimit-limit': MAX_REQUESTS_PER_WINDOW,
+        'x-backend-ratelimit-remaining': Math.max(remaining, 0), // Ensure non-negative value
+        'x-backend-ratelimit-reset': resetTime
+    });
+
+    // If the user has exceeded the rate limit, return a 429 response
     if (userLimits.requests.length >= MAX_REQUESTS_PER_WINDOW) {
-        const resetTime = userLimits.requests[0] + BACKEND_RATE_LIMIT_WINDOW;
         return res.status(429).json({
-            error: 'Backend rate limit exceeded',
-            backendRateLimit: {
+            error: 'Rate limit exceeded. Please try again later.',
+            rateLimit: {
                 limit: MAX_REQUESTS_PER_WINDOW,
                 remaining: 0,
-                resetTime: resetTime,
-                retryAfter: Math.ceil((resetTime - now) / 1000)
+                reset: resetTime
             }
         });
     }
-    
-    // Add current request
+
+    // Add the current request timestamp
     userLimits.requests.push(now);
-    
-    // Add our backend rate limit headers
-    res.set({
-        'X-Backend-RateLimit-Limit': MAX_REQUESTS_PER_WINDOW,
-        'X-Backend-RateLimit-Remaining': MAX_REQUESTS_PER_WINDOW - userLimits.requests.length,
-        'X-Backend-RateLimit-Reset': Math.ceil((now + BACKEND_RATE_LIMIT_WINDOW) / 1000)
-    });
-    
+
     next();
 };
 
@@ -164,8 +172,8 @@ const addRateLimitInfoToResponse = (req, res, data) => {
                 rateLimited: osmInfo.rateLimited || false
             } : null,
             backend: {
-                remaining: res.getHeader('X-Backend-RateLimit-Remaining'),
-                limit: res.getHeader('X-Backend-RateLimit-Limit')
+                remaining: res.getHeader('x-backend-ratelimit-remaining'),
+                limit: res.getHeader('x-backend-ratelimit-limit')
             }
         }
     };

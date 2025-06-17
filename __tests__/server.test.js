@@ -59,29 +59,31 @@ describe('Vikings OSM Backend API', () => {
   });
 
   describe('Rate Limiting Middleware', () => {
-    test('should add rate limit headers to API responses', async () => {
+    // Test for rate limit headers
+    it('should add rate limit headers to API responses', async () => {
       const response = await request(app)
-        .post('/get-terms')
-        .send({ access_token: 'test_token' });
+          .get('/rate-limit-status')
+          .set('Authorization', 'Bearer test_token');
+
+      console.log('Response headers:', response.headers);
 
       expect(response.headers).toHaveProperty('x-backend-ratelimit-limit');
       expect(response.headers).toHaveProperty('x-backend-ratelimit-remaining');
       expect(response.headers).toHaveProperty('x-backend-ratelimit-reset');
     });
 
-    test('should decrement remaining count on each request', async () => {
-      // Make first request to an endpoint that uses rate limiting
+    // Test for decrementing remaining count
+    it('should decrement remaining count on each request', async () => {
       const response1 = await request(app)
-        .post('/get-terms')
-        .send({ access_token: 'test_token' });
-      
+          .get('/rate-limit-status')
+          .set('Authorization', 'Bearer test_token');
+
       const remaining1 = parseInt(response1.headers['x-backend-ratelimit-remaining']);
 
-      // Make second request  
       const response2 = await request(app)
-        .post('/get-terms')
-        .send({ access_token: 'test_token' });
-        
+          .get('/rate-limit-status')
+          .set('Authorization', 'Bearer test_token');
+
       const remaining2 = parseInt(response2.headers['x-backend-ratelimit-remaining']);
 
       expect(remaining2).toBeLessThan(remaining1);
@@ -89,9 +91,9 @@ describe('Vikings OSM Backend API', () => {
   });
 
   describe('API Endpoints Validation', () => {
-    test('POST /get-terms should require access token', async () => {
+    test('GET /get-terms should require access token', async () => {
       const response = await request(app)
-        .post('/get-terms')
+        .get('/get-terms')
         .send({})
         .expect(400);
 
@@ -99,9 +101,9 @@ describe('Vikings OSM Backend API', () => {
       expect(response.body.error).toContain('access token');
     });
 
-    test('POST /get-section-config should require access token and sectionid', async () => {
+    test('GET /get-section-config should require access token and sectionid', async () => {
       const response = await request(app)
-        .post('/get-section-config')
+        .get('/get-section-config')
         .send({})
         .expect(400);
 
