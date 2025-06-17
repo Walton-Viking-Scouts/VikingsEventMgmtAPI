@@ -62,6 +62,52 @@ app.get('/get-flexi-structure', osmController.getFlexiStructure);
 app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
 app.post('/update-flexi-record', osmController.updateFlexiRecord);
 
+// OAuth callback route to handle the authorization code from OSM
+app.get('/oauth/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      console.error('No authorization code received');
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}?error=no_code`);
+    }
+
+    console.log('Received authorization code:', code.substring(0, 20) + '...');
+
+    // Exchange authorization code for access token
+    const tokenResponse = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: process.env.OSM_CLIENT_ID,
+        client_secret: process.env.OSM_CLIENT_SECRET,
+        code: code,
+        redirect_uri: `${process.env.BACKEND_URL || 'http://localhost:3001'}/oauth/callback`
+      })
+    });
+
+    const tokenData = await tokenResponse.json();
+    
+    if (!tokenResponse.ok) {
+      console.error('Token exchange failed:', tokenData);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}?error=token_exchange_failed`);
+    }
+
+    console.log('Token exchange successful');
+    
+    // Redirect back to frontend with the access token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}?access_token=${tokenData.access_token}&token_type=${tokenData.token_type}`);
+    
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}?error=callback_error`);
+  }
+});
+
 // ========================================
 // ERROR HANDLING
 // ========================================
@@ -88,6 +134,16 @@ app.use((err, req, res, next) => {
         message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
     });
 });
+
+// Debug the OAuth callback flow
+// Common issues that cause authentication to get stuck:
+// 1. Missing or incorrect OAuth callback URL configuration
+// 2. Error in token exchange with OSM
+// 3. Missing error handling in callback route
+// 4. CORS issues with frontend redirect
+// 5. Session/token storage issues
+
+// Check the /oauth/callback route for proper error handling and logging
 
 // ========================================
 // SERVER STARTUP
