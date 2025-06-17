@@ -121,11 +121,13 @@ const getSectionConfig = async (req, res) => {
 
 // Proxy getUserRoles to avoid CORS
 const getUserRoles = async (req, res) => {
-    const { access_token } = req.query;
+    const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
+    
     if (!access_token) {
-        return res.status(400).json({ error: 'No access token provided' });
+        return res.status(401).json({ error: 'Access token is required in Authorization header' });
     }
+    
     try {
         const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles', {
             method: 'POST',

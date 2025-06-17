@@ -62,7 +62,9 @@ app.get('/get-flexi-structure', osmController.getFlexiStructure);
 app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
 app.post('/update-flexi-record', osmController.updateFlexiRecord);
 
-
+// Check if getUserRoles route is properly defined and matches frontend call
+// Frontend is calling GET /get-user-roles with Authorization header
+// Need to ensure route exists and controller function is updated for header-based auth
 
 // ========================================
 // ERROR HANDLING
