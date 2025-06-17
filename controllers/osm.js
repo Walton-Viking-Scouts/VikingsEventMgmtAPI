@@ -171,7 +171,7 @@ const getEvents = async (req, res) => {
 
     try {
         const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/api.php?action=getEvents&sectionid=${sectionid}&termid=${termid}`, {
-            method: 'POST',
+            method: 'GET',
             headers: {
                 'Authorization': `Bearer ${access_token}`,
                 'Content-Type': 'application/json'
