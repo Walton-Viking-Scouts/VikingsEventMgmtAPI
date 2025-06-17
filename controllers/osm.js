@@ -1,6 +1,6 @@
 // Import rate limiting utilities
 const { 
-    backendRateLimit, 
+    backendRateLimit,
     makeOSMRequest, 
     getSessionId, 
     getOSMRateLimitInfo, 
@@ -188,11 +188,18 @@ const getEvents = async (req, res) => {
 
 // Proxy getEventAttendance to avoid CORS
 const getEventAttendance = async (req, res) => {
-    const { access_token, sectionid, eventid } = req.query;
+    const { sectionid, termid, eventid } = req.query;
+    const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
-    if (!access_token || !sectionid || !eventid) {
-        return res.status(400).json({ error: 'Missing parameters' });
+    
+    if (!access_token) {
+        return res.status(401).json({ error: 'Access token is required in Authorization header' });
     }
+    
+    if (!sectionid || !termid || !eventid) {
+        return res.status(400).json({ error: 'sectionid, termid, and eventid are required' });
+    }
+
     try {
         const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/events/event/?action=get&sectionid=${sectionid}&eventid=${eventid}`, {
             method: 'GET',
