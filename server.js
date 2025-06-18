@@ -64,10 +64,20 @@ app.post('/update-flexi-record', osmController.updateFlexiRecord);
 
 // Add OAuth environment validation endpoint for debugging
 app.get('/oauth/debug', (req, res) => {
+  const getFrontendUrl = () => {
+    if (process.env.FRONTEND_URL) {
+      return process.env.FRONTEND_URL;
+    }
+    return process.env.NODE_ENV === 'production' 
+      ? 'https://your-production-frontend.com'
+      : 'https://localhost:3000';
+  };
+
   res.json({
     clientId: process.env.OAUTH_CLIENT_ID ? 'Set' : 'Missing',
     clientSecret: process.env.OAUTH_CLIENT_SECRET ? 'Set' : 'Missing',
-    frontendUrl: process.env.FRONTEND_URL || 'Not set',
+    frontendUrl: getFrontendUrl(),
+    nodeEnv: process.env.NODE_ENV || 'Not set',
     backendUrl: process.env.BACKEND_URL || 'Not set',
     authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-event-manager.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`
   });
