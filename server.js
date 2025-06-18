@@ -184,7 +184,7 @@ app.get('/oauth/callback', async (req, res) => {
     console.log('Token exchange successful, redirecting to frontend...');
     
     // Redirect back to frontend with the access token
-    res.redirect(`${getFrontendUrl()}/auth/success?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
+    res.redirect(`${getFrontendUrl()}/auth-success.html?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
     
   } catch (error) {
     console.error('OAuth callback error:', error);
