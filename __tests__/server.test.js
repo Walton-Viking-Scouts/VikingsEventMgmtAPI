@@ -95,10 +95,10 @@ describe('Vikings OSM Backend API', () => {
       const response = await request(app)
         .get('/get-terms')
         .send({})
-        .expect(400);
+        .expect(401);
 
       expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toContain('access token');
+      expect(response.body.error).toContain('Access token is required');
     });
 
     test('GET /get-section-config should require access token and sectionid', async () => {
