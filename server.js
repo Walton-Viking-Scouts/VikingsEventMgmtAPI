@@ -1,17 +1,29 @@
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
- // Dynamically set frontend URL based on environment
-const getFrontendUrl = () => {
-    if (process.env.FRONTEND_URL) {
-    // Return as-is since FRONTEND_URL should include the protocol
-    return process.env.FRONTEND_URL;
-    }
-    // Fallback based on NODE_ENV
-    return process.env.NODE_ENV === 'production' 
-    ? 'https://your-production-frontend.com'  // Replace with your actual production frontend URL
-    : 'https://localhost:3000';
-};;
+const cookieParser = require('cookie-parser');    // Dynamically set frontend URL based on environment (ensure no double protocol)
+    const getFrontendUrl = () => {
+      let url;
+      if (process.env.FRONTEND_URL) {
+        url = process.env.FRONTEND_URL;
+      } else {
+        // Fallback based on NODE_ENV
+        url = process.env.NODE_ENV === 'production' 
+          ? 'https://your-production-frontend.com'  // Replace with your actual production frontend URL
+          : 'https://localhost:3000';
+      }
+      
+      // Ensure URL doesn't have double protocol
+      if (url.startsWith('https://https://') || url.startsWith('http://https://')) {
+        url = url.replace(/^https?:\/\//, '');
+      }
+      
+      // Ensure URL has protocol
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      
+      return url;
+    };;
 
 // Load environment variables
 require('dotenv').config();
