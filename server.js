@@ -77,6 +77,88 @@ app.get('/oauth/debug', (req, res) => {
 // Frontend is calling GET /get-user-roles with Authorization header
 // Need to ensure route exists and controller function is updated for header-based auth
 
+// OAuth callback route to handle the authorization code from OSM
+app.get('/oauth/callback', async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+    
+    console.log('OAuth callback received:', { 
+      code: code ? code.substring(0, 20) + '...' : 'none', 
+      state, 
+      error,
+      fullQuery: req.query 
+    });
+    
+    // Dynamically set frontend URL based on environment
+    const getFrontendUrl = () => {
+      if (process.env.FRONTEND_URL) {
+        return process.env.FRONTEND_URL;
+      }
+      // Fallback based on NODE_ENV
+      return process.env.NODE_ENV === 'production' 
+        ? 'https://https://vikings-eventmgmt.onrender.com/'  // Replace with your actual production frontend URL
+        : 'https://localhost:3000';
+    };
+    
+    if (error) {
+      console.error('OAuth error from OSM:', error);
+      return res.redirect(`${getFrontendUrl()}?error=${error}`);
+    }
+    
+    if (!code) {
+      console.error('No authorization code received');
+      return res.redirect(`${getFrontendUrl()}?error=no_code`);
+    }
+
+    console.log('Attempting token exchange with OSM...');
+
+    // Exchange authorization code for access token
+    const tokenPayload = {
+      grant_type: 'authorization_code',
+      client_id: process.env.OAUTH_CLIENT_ID,
+      client_secret: process.env.OAUTH_CLIENT_SECRET,
+      code: code,
+      redirect_uri: `${process.env.BACKEND_URL || 'https://vikings-osm-event-manager.onrender.com'}/oauth/callback`
+    };
+    
+    console.log('Token exchange payload:', {
+      ...tokenPayload,
+      client_secret: '***hidden***',
+      code: code.substring(0, 20) + '...'
+    });
+
+    const tokenResponse = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(tokenPayload)
+    });
+
+    console.log('Token response status:', tokenResponse.status);
+    
+    const tokenData = await tokenResponse.json();
+    console.log('Token response:', { 
+      ...tokenData, 
+      access_token: tokenData.access_token ? tokenData.access_token.substring(0, 20) + '...' : 'none'
+    });
+    
+    if (!tokenResponse.ok) {
+      console.error('Token exchange failed:', tokenData);
+      return res.redirect(`${getFrontendUrl()}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
+    }
+
+    console.log('Token exchange successful, redirecting to frontend...');
+    
+    // Redirect back to frontend with the access token
+    res.redirect(`${getFrontendUrl()}/auth/success?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
+    
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.redirect(`${getFrontendUrl()}?error=callback_error&details=${encodeURIComponent(error.message)}`);
+  }
+});
+
 // ========================================
 // ERROR HANDLING
 // ========================================
