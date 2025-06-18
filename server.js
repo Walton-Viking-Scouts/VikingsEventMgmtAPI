@@ -62,6 +62,17 @@ app.get('/get-flexi-structure', osmController.getFlexiStructure);
 app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
 app.post('/update-flexi-record', osmController.updateFlexiRecord);
 
+// Add OAuth environment validation endpoint for debugging
+app.get('/oauth/debug', (req, res) => {
+  res.json({
+    clientId: process.env.OSM_CLIENT_ID ? 'Set' : 'Missing',
+    clientSecret: process.env.OSM_CLIENT_SECRET ? 'Set' : 'Missing',
+    frontendUrl: process.env.FRONTEND_URL || 'Not set',
+    backendUrl: process.env.BACKEND_URL || 'Not set',
+    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OSM_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'http://localhost:3001')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`
+  });
+});
+
 // Check if getUserRoles route is properly defined and matches frontend call
 // Frontend is calling GET /get-user-roles with Authorization header
 // Need to ensure route exists and controller function is updated for header-based auth
