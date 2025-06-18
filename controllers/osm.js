@@ -264,7 +264,7 @@ const getEventAttendance = async (req, res) => {
     }
 
     try {
-        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/events/event/?action=get&sectionid=${sectionid}&eventid=${eventid}`, {
+        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/events/event/?action=get&sectionid=${sectionid}&eventid=${eventid}&termid=${termid}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${access_token}`
