@@ -187,7 +187,30 @@ const getEvents = async (req, res) => {
             });
         }
         
-        const data = await response.json();
+        // Check if response is ok and has content
+        if (!response.ok) {
+            console.error(`OSM API error: ${response.status} ${response.statusText}`);
+            return res.status(response.status).json({ error: `OSM API error: ${response.status}` });
+        }
+        
+        // Get response text first to check if it's empty
+        const responseText = await response.text();
+        console.log('OSM API response text:', responseText.substring(0, 200) + '...');
+        
+        if (!responseText.trim()) {
+            console.error('Empty response from OSM API');
+            return res.status(500).json({ error: 'Empty response from OSM API' });
+        }
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            console.error('Response text:', responseText);
+            return res.status(500).json({ error: 'Invalid JSON response from OSM API' });
+        }
+        
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
     } catch (err) {
