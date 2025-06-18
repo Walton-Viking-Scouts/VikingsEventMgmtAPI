@@ -106,7 +106,7 @@ app.get('/oauth/callback', async (req, res) => {
       }
       // Fallback based on NODE_ENV
       return process.env.NODE_ENV === 'production' 
-        ? 'https://https://vikings-eventmgmt.onrender.com/'  // Replace with your actual production frontend URL
+        ? 'https://https://vikings-eventmgmt.onrender.com'  // Replace with your actual production frontend URL
         : 'https://localhost:3000';
     };
     
