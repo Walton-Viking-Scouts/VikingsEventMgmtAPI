@@ -21,15 +21,17 @@ if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
     app.use(Sentry.Handlers.tracingHandler());
 }
 
-// CORS with credentials support
+// Update CORS configuration to allow localhost and production frontend
 app.use(cors({
   origin: [
-    'https://vikings-eventmgmt.onrender.com',
-    'https://localhost:3000',
-    'http://localhost:3000',
-    'https://vikings-osm-event-manager.onrender.com'
+    'https://vikings-eventmgmt.onrender.com',  // Production frontend
+    'https://localhost:3000',                  // Development frontend (https)
+    'http://localhost:3000'                    // Development frontend (http)
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
 }));
 
 app.use(express.json());
