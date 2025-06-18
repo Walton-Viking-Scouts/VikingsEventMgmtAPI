@@ -1,29 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');    // Dynamically set frontend URL based on environment (ensure no double protocol)
-    const getFrontendUrl = () => {
-      let url;
-      if (process.env.FRONTEND_URL) {
-        url = process.env.FRONTEND_URL;
-      } else {
-        // Fallback based on NODE_ENV
-        url = process.env.NODE_ENV === 'production' 
-          ? 'https://vikings-eventmgmt.onrender.com'  // Replace with your actual production frontend URL
-          : 'https://localhost:3000';
-      }
-      
-      // Ensure URL doesn't have double protocol
-      if (url.startsWith('https://https://') || url.startsWith('http://https://')) {
-        url = url.replace(/^https?:\/\//, '');
-      }
-      
-      // Ensure URL has protocol
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-      }
-      
-      return url;
-    };;
+const cookieParser = require('cookie-parser');
 
 // Load environment variables
 require('dotenv').config();
@@ -124,13 +101,32 @@ app.get('/oauth/callback', async (req, res) => {
     
     // Dynamically set frontend URL based on environment
     const getFrontendUrl = () => {
+      let url;
+      
+      // Priority 1: Explicit FRONTEND_URL override
       if (process.env.FRONTEND_URL) {
-        return process.env.FRONTEND_URL;
+        url = process.env.FRONTEND_URL;
+      } 
+      // Priority 2: DEV_MODE flag for development
+      else if (process.env.DEV_MODE === 'true') {
+        url = 'https://localhost:3000';
+      } 
+      // Priority 3: Default to production frontend
+      else {
+        url = 'https://vikings-eventmgmt.onrender.com';
       }
-      // Fallback based on NODE_ENV
-      return process.env.NODE_ENV === 'production' 
-        ? 'https://vikings-eventmgmt.onrender.com'  // Replace with your actual production frontend URL
-        : 'https://localhost:3000';
+      
+      // Ensure URL doesn't have double protocol
+      if (url.startsWith('https://https://') || url.startsWith('http://https://')) {
+        url = url.replace(/^https?:\/\//, '');
+      }
+      
+      // Ensure URL has protocol
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      
+      return url;
     };
     
     if (error) {
@@ -181,13 +177,39 @@ app.get('/oauth/callback', async (req, res) => {
       return res.redirect(`${getFrontendUrl()}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
     }
 
-    console.log('Token exchange successful, redirecting to frontend...');
+    console.log('Token exchange successful, sending secure response...');
     
-    // Redirect back to frontend with the access token
-    res.redirect(`${getFrontendUrl()}/auth-success.html?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
+    // Instead of redirecting with token in URL, serve a secure HTML page
+    const frontendUrl = getFrontendUrl();
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Authentication Success</title>
+    </head>
+    <body>
+        <script>
+            // Store token securely
+            sessionStorage.setItem('osm_access_token', '${tokenData.access_token}');
+            sessionStorage.setItem('osm_token_type', '${tokenData.token_type || 'Bearer'}');
+            
+            // Redirect to frontend app
+            window.location.href = '${frontendUrl}/dashboard'; // or your main app page
+        </script>
+        <p>Redirecting to application...</p>
+    </body>
+    </html>
+    `;
+    
+    res.send(html);
     
   } catch (error) {
     console.error('OAuth callback error:', error);
+    const getFrontendUrl = () => {
+      if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
+      if (process.env.DEV_MODE === 'true') return 'https://localhost:3000';
+      return 'https://vikings-eventmgmt.onrender.com';
+    };
     res.redirect(`${getFrontendUrl()}?error=callback_error&details=${encodeURIComponent(error.message)}`);
   }
 });
