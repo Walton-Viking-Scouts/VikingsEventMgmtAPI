@@ -177,31 +177,12 @@ app.get('/oauth/callback', async (req, res) => {
       return res.redirect(`${getFrontendUrl()}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
     }
 
-    console.log('Token exchange successful, sending secure response...');
+    console.log('Token exchange successful, redirecting to frontend...');
     
-    // Instead of redirecting with token in URL, serve a secure HTML page
+    // Redirect to frontend auth-success page with token as URL parameter
+    // This allows the frontend to store the token in sessionStorage on the correct domain
     const frontendUrl = getFrontendUrl();
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Authentication Success</title>
-    </head>
-    <body>
-        <script>
-            // Store token securely
-            sessionStorage.setItem('access_token', '${tokenData.access_token}');
-            sessionStorage.setItem('token_type', '${tokenData.token_type || 'Bearer'}');
-            
-            // Redirect to frontend app
-            window.location.href = '${frontendUrl}/'; // or your main app page
-        </script>
-        <p>Redirecting to application...</p>
-    </body>
-    </html>
-    `;
-    
-    res.send(html);
+    res.redirect(`${frontendUrl}/auth-success.html?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
     
   } catch (error) {
     console.error('O callback error:', error);
