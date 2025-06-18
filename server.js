@@ -190,11 +190,11 @@ app.get('/oauth/callback', async (req, res) => {
     <body>
         <script>
             // Store token securely
-            sessionStorage.setItem('osm_access_token', '${tokenData.access_token}');
-            sessionStorage.setItem('osm_token_type', '${tokenData.token_type || 'Bearer'}');
+            sessionStorage.setItem('access_token', '${tokenData.access_token}');
+            sessionStorage.setItem('token_type', '${tokenData.token_type || 'Bearer'}');
             
             // Redirect to frontend app
-            window.location.href = '${frontendUrl}/auth-success.html.html'; // or your main app page
+            window.location.href = '${frontendUrl}/'; // or your main app page
         </script>
         <p>Redirecting to application...</p>
     </body>
