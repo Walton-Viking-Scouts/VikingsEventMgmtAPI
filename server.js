@@ -194,7 +194,7 @@ app.get('/oauth/callback', async (req, res) => {
             sessionStorage.setItem('osm_token_type', '${tokenData.token_type || 'Bearer'}');
             
             // Redirect to frontend app
-            window.location.href = '${frontendUrl}/index.html'; // or your main app page
+            window.location.href = '${frontendUrl}/auth-success.html.html'; // or your main app page
         </script>
         <p>Redirecting to application...</p>
     </body>
