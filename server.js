@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');    // Dynamically set frontend UR
       } else {
         // Fallback based on NODE_ENV
         url = process.env.NODE_ENV === 'production' 
-          ? 'https://your-production-frontend.com'  // Replace with your actual production frontend URL
+          ? 'https://vikings-eventmgmt.onrender.com'  // Replace with your actual production frontend URL
           : 'https://localhost:3000';
       }
       
@@ -129,7 +129,7 @@ app.get('/oauth/callback', async (req, res) => {
       }
       // Fallback based on NODE_ENV
       return process.env.NODE_ENV === 'production' 
-        ? 'https://https://vikings-eventmgmt.onrender.com'  // Replace with your actual production frontend URL
+        ? 'https://vikings-eventmgmt.onrender.com'  // Replace with your actual production frontend URL
         : 'https://localhost:3000';
     };
     
