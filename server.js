@@ -204,7 +204,7 @@ app.get('/oauth/callback', async (req, res) => {
     res.send(html);
     
   } catch (error) {
-    console.error('OAuth callback error:', error);
+    console.error('O callback error:', error);
     const getFrontendUrl = () => {
       if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
       if (process.env.DEV_MODE === 'true') return 'https://localhost:3000';
