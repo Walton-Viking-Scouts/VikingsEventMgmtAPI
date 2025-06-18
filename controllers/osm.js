@@ -54,17 +54,21 @@ const getRateLimitStatus = (req, res) => {
 };
 
 // Proxy getTerms to avoid CORS
+// Update getTerms function to use Authorization header
 const getTerms = async (req, res) => {
-    const { access_token } = req.query;
+    const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
+    
     if (!access_token) {
-        return res.status(400).json({ error: 'No access token provided' });
+        return res.status(401).json({ error: 'Access token is required in Authorization header' });
     }
+
     try {
-        const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/api.php?action=getTerms', {
+        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/api.php?action=getTerms`, {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${access_token}`
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
             }
         }, sessionId);
         
@@ -77,7 +81,26 @@ const getTerms = async (req, res) => {
             });
         }
         
-        const data = await response.json();
+        if (!response.ok) {
+            console.error(`OSM API error: ${response.status} ${response.statusText}`);
+            return res.status(response.status).json({ error: `OSM API error: ${response.status}` });
+        }
+        
+        const responseText = await response.text();
+        
+        if (!responseText.trim()) {
+            console.error('Empty response from OSM API');
+            return res.status(500).json({ error: 'Empty response from OSM API' });
+        }
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            return res.status(500).json({ error: 'Invalid JSON response from OSM API' });
+        }
+        
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
     } catch (err) {
