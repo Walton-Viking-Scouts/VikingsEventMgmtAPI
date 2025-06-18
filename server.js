@@ -1,6 +1,16 @@
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
+const cookieParser = require('cooki    // Dynamically set frontend URL based on environment
+    const getFrontendUrl = () => {
+      if (process.env.FRONTEND_URL) {
+        // Return as-is since FRONTEND_URL should include the protocol
+        return process.env.FRONTEND_URL;
+      }
+      // Fallback based on NODE_ENV
+      return process.env.NODE_ENV === 'production' 
+        ? 'https://your-production-frontend.com'  // Replace with your actual production frontend URL
+        : 'https://localhost:3000';
+    };;
 
 // Load environment variables
 require('dotenv').config();
