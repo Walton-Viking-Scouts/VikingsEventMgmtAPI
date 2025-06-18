@@ -69,7 +69,7 @@ app.get('/oauth/debug', (req, res) => {
       return process.env.FRONTEND_URL;
     }
     return process.env.NODE_ENV === 'production' 
-      ? 'https://your-production-frontend.com'
+      ? 'https://vikings-eventmgmt.onrender.com'
       : 'https://localhost:3000';
   };
 
