@@ -67,18 +67,20 @@ app.post('/update-flexi-record', osmController.updateFlexiRecord);
 // Add OAuth environment validation endpoint for debugging
 app.get('/oauth/debug', (req, res) => {
   const getFrontendUrl = () => {
-    if (process.env.FRONTEND_URL) {
-      return process.env.FRONTEND_URL;
+    const env = req.query.env;
+    
+    if (env === 'dev' || env === 'development') {
+      return 'https://localhost:3000';
     }
-    return process.env.NODE_ENV === 'production' 
-      ? 'https://vikings-eventmgmt.onrender.com'
-      : 'https://localhost:3000';
+    
+    return 'https://vikings-eventmgmt.onrender.com';
   };
 
   res.json({
     clientId: process.env.OAUTH_CLIENT_ID ? 'Set' : 'Missing',
     clientSecret: process.env.OAUTH_CLIENT_SECRET ? 'Set' : 'Missing',
     frontendUrl: getFrontendUrl(),
+    envParam: req.query.env || 'Not set',
     nodeEnv: process.env.NODE_ENV || 'Not set',
     backendUrl: process.env.BACKEND_URL || 'Not set',
     authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-event-manager.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`
@@ -101,34 +103,16 @@ app.get('/oauth/callback', async (req, res) => {
       fullQuery: req.query 
     });
     
-    // Dynamically set frontend URL based on environment
+    // Dynamically set frontend URL based on query parameter
     const getFrontendUrl = () => {
-      let url;
+      const env = req.query.env;
       
-      // Priority 1: Explicit FRONTEND_URL override
-      if (process.env.FRONTEND_URL) {
-        url = process.env.FRONTEND_URL;
-      } 
-      // Priority 2: DEV_MODE flag for development
-      else if (process.env.DEV_MODE === 'true') {
-        url = 'https://localhost:3000';
-      } 
-      // Priority 3: Default to production frontend
-      else {
-        url = 'https://vikings-eventmgmt.onrender.com';
+      if (env === 'dev' || env === 'development') {
+        return 'https://localhost:3000';
       }
       
-      // Ensure URL doesn't have double protocol
-      if (url.startsWith('https://https://') || url.startsWith('http://https://')) {
-        url = url.replace(/^https?:\/\//, '');
-      }
-      
-      // Ensure URL has protocol
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-      }
-      
-      return url;
+      // Default to production frontend
+      return 'https://vikings-eventmgmt.onrender.com';
     };
     
     if (error) {
