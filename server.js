@@ -67,9 +67,9 @@ app.post('/update-flexi-record', osmController.updateFlexiRecord);
 // Add OAuth environment validation endpoint for debugging
 app.get('/oauth/debug', (req, res) => {
   const getFrontendUrl = () => {
-    const env = req.query.env;
+    const state = req.query.state;
     
-    if (env === 'dev' || env === 'development') {
+    if (state === 'dev' || state === 'development') {
       return 'https://localhost:3000';
     }
     
@@ -80,7 +80,7 @@ app.get('/oauth/debug', (req, res) => {
     clientId: process.env.OAUTH_CLIENT_ID ? 'Set' : 'Missing',
     clientSecret: process.env.OAUTH_CLIENT_SECRET ? 'Set' : 'Missing',
     frontendUrl: getFrontendUrl(),
-    envParam: req.query.env || 'Not set',
+    stateParam: req.query.state || 'Not set',
     nodeEnv: process.env.NODE_ENV || 'Not set',
     backendUrl: process.env.BACKEND_URL || 'Not set',
     authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-event-manager.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`
@@ -103,11 +103,10 @@ app.get('/oauth/callback', async (req, res) => {
       fullQuery: req.query 
     });
     
-    // Dynamically set frontend URL based on query parameter
+    // Dynamically set frontend URL based on state parameter
     const getFrontendUrl = () => {
-      const env = req.query.env;
-      
-      if (env === 'dev' || env === 'development') {
+      // Check state parameter for environment info
+      if (state === 'dev' || state === 'development') {
         return 'https://localhost:3000';
       }
       
