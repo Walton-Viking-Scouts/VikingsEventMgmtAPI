@@ -105,12 +105,19 @@ app.get('/oauth/callback', async (req, res) => {
     
     // Dynamically set frontend URL based on state parameter
     const getFrontendUrl = () => {
+      console.log('OAuth callback state parameter:', state);
+      
       // Check state parameter for environment info
       if (state === 'dev' || state === 'development') {
+        console.log('Development environment detected, redirecting to localhost');
         return 'https://localhost:3000';
+      } else if (state === 'prod' || state === 'production') {
+        console.log('Production environment detected, redirecting to production frontend');
+        return 'https://vikings-eventmgmt.onrender.com';
       }
       
-      // Default to production frontend
+      // Default to production frontend if no state or unrecognized state
+      console.log('No state or unrecognized state, defaulting to production frontend');
       return 'https://vikings-eventmgmt.onrender.com';
     };
     
