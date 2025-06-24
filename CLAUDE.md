@@ -45,7 +45,7 @@ This is a Node.js Express backend that serves as an OAuth proxy for Online Scout
 - `middleware/rateLimiting.js` - Dual-layer rate limiting (backend + OSM API tracking)
 
 **Configuration**:
-- `config/sentry.js` - Sentry error monitoring setup
+- `config/sentry.js` - Sentry error monitoring and structured logging setup
 
 ### Rate Limiting Architecture
 
@@ -77,8 +77,8 @@ Tokens are stored in-memory (Map) with expiration tracking.
 
 **Authentication**: `/token`, `/logout`, `/oauth/callback`, `/oauth/debug`
 **OSM Proxy**: All use Authorization header with Bearer token
-- GET endpoints: `/get-terms`, `/get-section-config`, `/get-user-roles`, `/get-events`, etc.
-- POST endpoint: `/update-flexi-record`
+- GET endpoints: `/get-terms`, `/get-section-config`, `/get-user-roles`, `/get-events`, `/get-flexi-records`, `/get-single-flexi-record`, `/get-flexi-structure`, `/get-startup-data`
+- POST endpoint: `/update-flexi-record` (with enhanced validation and Sentry logging)
 **Utility**: `/rate-limit-status`
 
 ### Environment Variables Required
@@ -100,11 +100,35 @@ Tests are located in `__tests__/` directory:
 
 Jest configuration prevents port conflicts with single worker and handles async cleanup properly.
 
+### Sentry Structured Logging
+
+The application implements comprehensive structured logging using Sentry:
+
+**Configuration Features:**
+- Structured logging enabled with `_experiments: { enableLogs: true }`
+- Console logging integration automatically captures console.log/error/warn
+- Error monitoring with OSM-specific context and rate limit information
+- Performance profiling in production environments
+
+**Logging Patterns:**
+- Import: `const Sentry = require('../config/sentry'); const { logger } = Sentry;`
+- Structured context: All logs include `endpoint`, `sessionId`, and relevant parameters
+- Log levels: `logger.info()`, `logger.error()`, `logger.warn()`, `logger.debug()`
+- Template literals: Use `logger.fmt` for dynamic values in log messages
+
+**Enhanced updateFlexiRecord Logging:**
+- Request validation with parameter logging
+- OSM API request/response tracking
+- Rate limit monitoring and warnings
+- Error context with full stack traces
+- Success confirmation with operation details
+
 ### Key Implementation Notes
 
 - All OSM proxy endpoints extract access tokens from Authorization headers
 - Rate limiting headers are automatically added to responses
 - Error responses include rate limit information when applicable
 - OSM API responses are wrapped with rate limit info before sending to frontend
-- Comprehensive logging for OAuth callback debugging
+- Enhanced validation for flexi record updates with field ID format checking
+- Comprehensive Sentry logging for debugging and monitoring
 - Graceful shutdown handling with SIGTERM
