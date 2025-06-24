@@ -20,9 +20,15 @@ try {
                 new Sentry.Integrations.Http({ tracing: true }),
                 new Sentry.Integrations.Express({ app: express() }),
                 new ProfilingIntegration(),
+                // Send console.log, console.error, and console.warn calls as logs to Sentry
+                Sentry.consoleLoggingIntegration({ levels: ["log", "error", "warn"] }),
             ],
             tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
             profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+            // Enable structured logging
+            _experiments: {
+                enableLogs: true,
+            },
             beforeSend(event, hint) {
                 if (event.tags && event.tags.section === 'osm-api') {
                     event.contexts = {
@@ -36,7 +42,7 @@ try {
                 return event;
             }
         });
-        console.log('✅ Sentry initialized for error monitoring');
+        console.log('✅ Sentry initialized for error monitoring and structured logging');
     } else {
         console.log('⚠️  Sentry not initialized (missing SENTRY_DSN or test environment)');
     }

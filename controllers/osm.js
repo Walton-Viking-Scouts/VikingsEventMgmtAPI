@@ -9,6 +9,10 @@ const {
     BACKEND_RATE_LIMIT_WINDOW
 } = require('../middleware/rateLimiting');
 
+// Import Sentry for structured logging
+const Sentry = require('../config/sentry');
+const { logger } = Sentry || { logger: console }; // Fallback to console if Sentry not available
+
 // Rate limit status endpoint for frontend monitoring (needs access to rateLimitTracker)
 const getRateLimitStatus = (req, res) => {
     const sessionId = getSessionId(req);
@@ -555,23 +559,31 @@ const updateFlexiRecord = async (req, res) => {
     
     // Enhanced validation
     if (!access_token || !sectionid || !scoutid || !flexirecordid || !columnid || value === undefined) {
-        console.error('updateFlexiRecord: Missing required parameters', {
+        logger.error('updateFlexiRecord: Missing required parameters', {
             hasToken: !!access_token,
-            sectionid, scoutid, flexirecordid, columnid, value
+            sectionid, scoutid, flexirecordid, columnid, value,
+            endpoint: '/update-flexi-record'
         });
         return res.status(400).json({ error: 'Missing required parameters' });
     }
     
     // Validate field ID format (should be f_1, f_2, etc.)
     if (!columnid.match(/^f_\d+$/)) {
-        console.error('updateFlexiRecord: Invalid columnid format', { columnid });
+        logger.error('updateFlexiRecord: Invalid columnid format', { 
+            columnid,
+            endpoint: '/update-flexi-record'
+        });
         return res.status(400).json({ error: 'Invalid field ID format. Expected format: f_1, f_2, etc.' });
     }
     
-    console.log('updateFlexiRecord: Request parameters', {
-        sectionid, scoutid, flexirecordid, columnid, 
+    logger.info('updateFlexiRecord: Processing request', {
+        sectionid, 
+        scoutid, 
+        flexirecordid, 
+        columnid, 
         valueLength: value.length,
-        sessionId: sessionId.substring(0, 8) + '...'
+        sessionId: sessionId.substring(0, 8) + '...',
+        endpoint: '/update-flexi-record'
     });
     
     try {
@@ -583,9 +595,11 @@ const updateFlexiRecord = async (req, res) => {
             value: value
         });
         
-        console.log('updateFlexiRecord: Sending request to OSM', {
+        logger.debug('updateFlexiRecord: Sending request to OSM', {
             url: 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateRecord',
-            bodyString: requestBody.toString()
+            bodyString: requestBody.toString(),
+            sessionId: sessionId.substring(0, 8) + '...',
+            endpoint: '/update-flexi-record'
         });
         
         const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateRecord', {
@@ -597,11 +611,19 @@ const updateFlexiRecord = async (req, res) => {
             body: requestBody
         }, sessionId);
         
-        console.log('updateFlexiRecord: OSM response status', response.status);
+        logger.debug(logger.fmt`updateFlexiRecord: OSM response status: ${response.status}`, {
+            status: response.status,
+            endpoint: '/update-flexi-record',
+            sessionId: sessionId.substring(0, 8) + '...'
+        });
         
         if (response.status === 429) {
             const osmInfo = getOSMRateLimitInfo(sessionId);
-            console.warn('updateFlexiRecord: Rate limit exceeded', osmInfo);
+            logger.warn('updateFlexiRecord: Rate limit exceeded', { 
+                ...osmInfo,
+                endpoint: '/update-flexi-record',
+                sessionId: sessionId.substring(0, 8) + '...'
+            });
             return res.status(429).json({ 
                 error: 'OSM API rate limit exceeded',
                 rateLimitInfo: osmInfo,
@@ -611,10 +633,12 @@ const updateFlexiRecord = async (req, res) => {
         
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('updateFlexiRecord: OSM API error', {
+            logger.error('updateFlexiRecord: OSM API error', {
                 status: response.status,
                 statusText: response.statusText,
-                errorText
+                errorText,
+                endpoint: '/update-flexi-record',
+                sessionId: sessionId.substring(0, 8) + '...'
             });
             return res.status(response.status).json({ 
                 error: `OSM API error: ${response.status}`,
@@ -623,12 +647,25 @@ const updateFlexiRecord = async (req, res) => {
         }
         
         const data = await response.json();
-        console.log('updateFlexiRecord: Success', { success: data.ok || data.status });
+        logger.info('updateFlexiRecord: Success', { 
+            success: data.ok || data.status,
+            endpoint: '/update-flexi-record',
+            sessionId: sessionId.substring(0, 8) + '...'
+        });
         
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
     } catch (err) {
-        console.error('Error in /update-flexi-record:', err);
+        logger.error('updateFlexiRecord: Internal server error', {
+            error: err.message,
+            stack: err.stack,
+            endpoint: '/update-flexi-record',
+            sessionId: sessionId.substring(0, 8) + '...',
+            sectionid,
+            scoutid,
+            flexirecordid,
+            columnid
+        });
         res.status(500).json({ error: 'Internal Server Error', details: err.message });
     }
 };
