@@ -15,6 +15,64 @@ const osmController = require('./controllers/osm');
 
 const app = express();
 
+// Centralized frontend URL determination utility
+const getFrontendUrl = (req, options = {}) => {
+  const { state } = req.query;
+  const enableLogging = options.enableLogging || false;
+  
+  if (enableLogging) {
+    console.log('Determining frontend URL - state parameter:', state);
+    console.log('Query params:', req.query);
+  }
+  
+  // Check for frontend_url parameter first (highest priority)
+  const frontendUrlParam = req.query.frontend_url;
+  if (frontendUrlParam) {
+    if (enableLogging) console.log('Frontend URL parameter provided:', frontendUrlParam);
+    return frontendUrlParam;
+  }
+  
+  // Parse state parameter for embedded frontend URL
+  if (state && state.includes('frontend_url=')) {
+    const urlMatch = state.match(/frontend_url=([^&]+)/);
+    if (urlMatch) {
+      const extractedUrl = decodeURIComponent(urlMatch[1]);
+      if (enableLogging) console.log('Frontend URL extracted from state:', extractedUrl);
+      return extractedUrl;
+    }
+  }
+  
+  // Check Referer header as fallback for deployed environments
+  const referer = req.get('Referer');
+  if (referer && referer.includes('.onrender.com')) {
+    const refererUrl = new URL(referer);
+    const frontendUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
+    if (enableLogging) console.log('Frontend URL detected from Referer header:', frontendUrl);
+    return frontendUrl;
+  }
+  
+  // Environment-based detection
+  if (process.env.FRONTEND_URL) {
+    if (enableLogging) console.log('Using FRONTEND_URL environment variable');
+    return process.env.FRONTEND_URL;
+  }
+  
+  // Legacy state parameter support
+  if (state === 'dev' || state === 'development' || process.env.DEV_MODE === 'true') {
+    if (enableLogging) console.log('Development environment detected');
+    return 'https://localhost:3000';
+  }
+  
+  if (state === 'prod' || state === 'production' || (state && state.startsWith('prod'))) {
+    if (enableLogging) console.log('Production environment detected');
+    return 'https://vikings-eventmgmt.onrender.com';
+  }
+  
+  // Default fallback
+  if (enableLogging) console.log('Using default production frontend URL');
+  return 'https://vikings-eventmgmt.onrender.com';
+};
+
 // Sentry request handler (must be first middleware)
 if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
     app.use(Sentry.Handlers.requestHandler());
@@ -64,41 +122,10 @@ app.post('/update-flexi-record', osmController.updateFlexiRecord);
 
 // Add OAuth environment validation endpoint for debugging
 app.get('/oauth/debug', (req, res) => {
-  const getFrontendUrl = () => {
-    const state = req.query.state;
-    
-    // Check for frontend_url parameter first (highest priority)
-    const frontendUrlParam = req.query.frontend_url;
-    if (frontendUrlParam) {
-      return frontendUrlParam;
-    }
-    
-    // Parse state parameter for embedded frontend URL
-    if (state && state.includes('frontend_url=')) {
-      const urlMatch = state.match(/frontend_url=([^&]+)/);
-      if (urlMatch) {
-        return decodeURIComponent(urlMatch[1]);
-      }
-    }
-    
-    // Check Referer header as fallback
-    const referer = req.get('Referer');
-    if (referer && referer.includes('.onrender.com')) {
-      const refererUrl = new URL(referer);
-      return `${refererUrl.protocol}//${refererUrl.hostname}`;
-    }
-    
-    if (state === 'dev' || state === 'development') {
-      return 'https://localhost:3000';
-    }
-    
-    return 'https://vikings-eventmgmt.onrender.com';
-  };
-
   res.json({
     clientId: process.env.OAUTH_CLIENT_ID ? 'Set' : 'Missing',
     clientSecret: process.env.OAUTH_CLIENT_SECRET ? 'Set' : 'Missing',
-    frontendUrl: getFrontendUrl(),
+    frontendUrl: getFrontendUrl(req),
     stateParam: req.query.state || 'Not set',
     frontendUrlParam: req.query.frontend_url || 'Not set',
     refererHeader: req.get('Referer') || 'Not set',
@@ -108,9 +135,6 @@ app.get('/oauth/debug', (req, res) => {
   });
 });
 
-// Check if getUserRoles route is properly defined and matches frontend call
-// Frontend is calling GET /get-user-roles with Authorization header
-// Need to ensure route exists and controller function is updated for header-based auth
 
 // OAuth callback route to handle the authorization code from OSM
 app.get('/oauth/callback', async (req, res) => {
@@ -124,60 +148,15 @@ app.get('/oauth/callback', async (req, res) => {
       fullQuery: req.query 
     });
     
-    // Dynamically set frontend URL based on state parameter and frontend_url
-    const getFrontendUrl = () => {
-      console.log('OAuth callback state parameter:', state);
-      console.log('OAuth callback query params:', req.query);
-      
-      // Check for frontend_url parameter first (highest priority)
-      const frontendUrlParam = req.query.frontend_url;
-      if (frontendUrlParam) {
-        console.log('Frontend URL parameter provided:', frontendUrlParam);
-        return frontendUrlParam;
-      }
-      
-      // Parse state parameter for embedded frontend URL
-      // Format: "prod&frontend_url=https://pr-123-vikings-eventmgmt.onrender.com"
-      if (state && state.includes('frontend_url=')) {
-        const urlMatch = state.match(/frontend_url=([^&]+)/);
-        if (urlMatch) {
-          const extractedUrl = decodeURIComponent(urlMatch[1]);
-          console.log('Frontend URL extracted from state:', extractedUrl);
-          return extractedUrl;
-        }
-      }
-      
-      // Check Referer header as fallback for deployed environments
-      const referer = req.get('Referer');
-      if (referer && referer.includes('.onrender.com')) {
-        const refererUrl = new URL(referer);
-        const frontendUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
-        console.log('Frontend URL detected from Referer header:', frontendUrl);
-        return frontendUrl;
-      }
-      
-      // Check state parameter for environment info (legacy support)
-      if (state === 'dev' || state === 'development') {
-        console.log('Development environment detected, redirecting to localhost');
-        return 'https://localhost:3000';
-      } else if (state === 'prod' || state === 'production' || (state && state.startsWith('prod'))) {
-        console.log('Production environment detected, redirecting to production frontend');
-        return 'https://vikings-eventmgmt.onrender.com';
-      }
-      
-      // Default to production frontend if no state or unrecognized state
-      console.log('No state or unrecognized state, defaulting to production frontend');
-      return 'https://vikings-eventmgmt.onrender.com';
-    };
     
     if (error) {
       console.error('OAuth error from OSM:', error);
-      return res.redirect(`${getFrontendUrl()}?error=${error}`);
+      return res.redirect(`${getFrontendUrl(req, {enableLogging: true})}?error=${error}`);
     }
     
     if (!code) {
       console.error('No authorization code received');
-      return res.redirect(`${getFrontendUrl()}?error=no_code`);
+      return res.redirect(`${getFrontendUrl(req, {enableLogging: true})}?error=no_code`);
     }
 
     console.log('Attempting token exchange with OSM...');
@@ -215,24 +194,19 @@ app.get('/oauth/callback', async (req, res) => {
     
     if (!tokenResponse.ok) {
       console.error('Token exchange failed:', tokenData);
-      return res.redirect(`${getFrontendUrl()}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
+      return res.redirect(`${getFrontendUrl(req, {enableLogging: true})}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
     }
 
     console.log('Token exchange successful, redirecting to frontend...');
     
     // Redirect to frontend auth-success page with token as URL parameter
     // This allows the frontend to store the token in sessionStorage on the correct domain
-    const frontendUrl = getFrontendUrl();
+    const frontendUrl = getFrontendUrl(req, {enableLogging: true});
     res.redirect(`${frontendUrl}/auth-success.html?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
     
   } catch (error) {
-    console.error('O callback error:', error);
-    const getFrontendUrl = () => {
-      if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
-      if (process.env.DEV_MODE === 'true') return 'https://localhost:3000';
-      return 'https://vikings-eventmgmt.onrender.com';
-    };
-    res.redirect(`${getFrontendUrl()}?error=callback_error&details=${encodeURIComponent(error.message)}`);
+    console.error('OAuth callback error:', error);
+    res.redirect(`${getFrontendUrl(req)}?error=callback_error&details=${encodeURIComponent(error.message)}`);
   }
 });
 
@@ -263,15 +237,6 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Debug the OAuth callback flow
-// Common issues that cause authentication to get stuck:
-// 1. Missing or incorrect OAuth callback URL configuration
-// 2. Error in token exchange with OSM
-// 3. Missing error handling in callback route
-// 4. CORS issues with frontend redirect
-// 5. Session/token storage issues
-
-// Check the /oauth/callback route for proper error handling and logging
 
 // ========================================
 // SERVER STARTUP

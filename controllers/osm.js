@@ -242,12 +242,6 @@ const getEvents = async (req, res) => {
     }
 };
 
-// Debug the getEvents endpoint to understand the 400 error
-// Check what parameters and headers are required
-// Common issues:
-// - Missing Authorization header
-// - Missing required query parameters
-// - Incorrect parameter validation
 
 // Proxy getEventAttendance to avoid CORS
 const getEventAttendance = async (req, res) => {
@@ -465,8 +459,8 @@ const getSingleFlexiRecord = async (req, res) => {
     const { flexirecordid, sectionid, termid } = req.query;
     const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
-    if (!access_token || !sectionid || !sectionid || !termid) {
-        return res.status(400).json({ error: 'Missing access_token, sectionid, scoutid, or flexirecordid' });
+    if (!access_token || !sectionid || !flexirecordid || !termid) {
+        return res.status(400).json({ error: 'Missing access_token, sectionid, flexirecordid, or termid' });
     }
     try {
         const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getData&extraid=${flexirecordid}&sectionid=${sectionid}&termid=${termid}&nototal`, {
