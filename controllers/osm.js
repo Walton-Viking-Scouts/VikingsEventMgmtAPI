@@ -415,14 +415,14 @@ const getFlexiRecords = async (req, res) => {
 
 // Proxy getFlexiStructure to avoid CORS
 const getFlexiStructure = async (req, res) => {
-    const { sectionid, flexirecordid } = req.query;
+    const { sectionid, flexirecordid, termid } = req.query;
     const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
-    if (!access_token || !sectionid || !flexirecordid) {
-        return res.status(400).json({ error: 'Missing access_token, sectionid, or flexirecordid' });
+    if (!access_token || !sectionid || !flexirecordid || !termid) {
+        return res.status(400).json({ error: 'Missing access_token, sectionid, flexirecordid, or termid' });
     }
     try {
-        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getStructure&sectionid=${sectionid}&extraid=${flexirecordid}`, {
+        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getStructure&sectionid=${sectionid}&extraid=${flexirecordid}&termid=${termid}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${access_token}`
