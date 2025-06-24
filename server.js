@@ -67,6 +67,27 @@ app.get('/oauth/debug', (req, res) => {
   const getFrontendUrl = () => {
     const state = req.query.state;
     
+    // Check for frontend_url parameter first (highest priority)
+    const frontendUrlParam = req.query.frontend_url;
+    if (frontendUrlParam) {
+      return frontendUrlParam;
+    }
+    
+    // Parse state parameter for embedded frontend URL
+    if (state && state.includes('frontend_url=')) {
+      const urlMatch = state.match(/frontend_url=([^&]+)/);
+      if (urlMatch) {
+        return decodeURIComponent(urlMatch[1]);
+      }
+    }
+    
+    // Check Referer header as fallback
+    const referer = req.get('Referer');
+    if (referer && referer.includes('.onrender.com')) {
+      const refererUrl = new URL(referer);
+      return `${refererUrl.protocol}//${refererUrl.hostname}`;
+    }
+    
     if (state === 'dev' || state === 'development') {
       return 'https://localhost:3000';
     }
@@ -79,6 +100,8 @@ app.get('/oauth/debug', (req, res) => {
     clientSecret: process.env.OAUTH_CLIENT_SECRET ? 'Set' : 'Missing',
     frontendUrl: getFrontendUrl(),
     stateParam: req.query.state || 'Not set',
+    frontendUrlParam: req.query.frontend_url || 'Not set',
+    refererHeader: req.get('Referer') || 'Not set',
     nodeEnv: process.env.NODE_ENV || 'Not set',
     backendUrl: process.env.BACKEND_URL || 'Not set',
     authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-event-manager.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`
@@ -101,15 +124,43 @@ app.get('/oauth/callback', async (req, res) => {
       fullQuery: req.query 
     });
     
-    // Dynamically set frontend URL based on state parameter
+    // Dynamically set frontend URL based on state parameter and frontend_url
     const getFrontendUrl = () => {
       console.log('OAuth callback state parameter:', state);
+      console.log('OAuth callback query params:', req.query);
       
-      // Check state parameter for environment info
+      // Check for frontend_url parameter first (highest priority)
+      const frontendUrlParam = req.query.frontend_url;
+      if (frontendUrlParam) {
+        console.log('Frontend URL parameter provided:', frontendUrlParam);
+        return frontendUrlParam;
+      }
+      
+      // Parse state parameter for embedded frontend URL
+      // Format: "prod&frontend_url=https://pr-123-vikings-eventmgmt.onrender.com"
+      if (state && state.includes('frontend_url=')) {
+        const urlMatch = state.match(/frontend_url=([^&]+)/);
+        if (urlMatch) {
+          const extractedUrl = decodeURIComponent(urlMatch[1]);
+          console.log('Frontend URL extracted from state:', extractedUrl);
+          return extractedUrl;
+        }
+      }
+      
+      // Check Referer header as fallback for deployed environments
+      const referer = req.get('Referer');
+      if (referer && referer.includes('.onrender.com')) {
+        const refererUrl = new URL(referer);
+        const frontendUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
+        console.log('Frontend URL detected from Referer header:', frontendUrl);
+        return frontendUrl;
+      }
+      
+      // Check state parameter for environment info (legacy support)
       if (state === 'dev' || state === 'development') {
         console.log('Development environment detected, redirecting to localhost');
         return 'https://localhost:3000';
-      } else if (state === 'prod' || state === 'production') {
+      } else if (state === 'prod' || state === 'production' || (state && state.startsWith('prod'))) {
         console.log('Production environment detected, redirecting to production frontend');
         return 'https://vikings-eventmgmt.onrender.com';
       }
