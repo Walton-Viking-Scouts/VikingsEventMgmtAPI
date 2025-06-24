@@ -21,55 +21,80 @@ const getFrontendUrl = (req, options = {}) => {
   const enableLogging = options.enableLogging || false;
   
   if (enableLogging) {
-    console.log('Determining frontend URL - state parameter:', state);
-    console.log('Query params:', req.query);
+    console.log('🔍 getFrontendUrl - Raw state parameter:', state);
+    console.log('🔍 getFrontendUrl - All query params:', req.query);
+    console.log('🔍 getFrontendUrl - Referer header:', req.get('Referer'));
   }
   
   // Check for frontend_url parameter first (highest priority)
   const frontendUrlParam = req.query.frontend_url;
   if (frontendUrlParam) {
-    if (enableLogging) console.log('Frontend URL parameter provided:', frontendUrlParam);
+    if (enableLogging) console.log('✅ Frontend URL from parameter:', frontendUrlParam);
     return frontendUrlParam;
   }
   
-  // Parse state parameter for embedded frontend URL
+  // Parse state parameter for embedded frontend URL with better decoding
   if (state && state.includes('frontend_url=')) {
-    const urlMatch = state.match(/frontend_url=([^&]+)/);
+    if (enableLogging) console.log('🔍 State contains frontend_url, parsing...');
+    
+    // Handle both URL encoded and non-encoded state parameters
+    let decodedState = state;
+    try {
+      // Try decoding in case the state itself is URL encoded
+      decodedState = decodeURIComponent(state);
+      if (enableLogging) console.log('🔍 Decoded state:', decodedState);
+    } catch (e) {
+      if (enableLogging) console.log('🔍 State not URL encoded, using as-is');
+    }
+    
+    // Extract frontend_url from the state parameter
+    const urlMatch = decodedState.match(/frontend_url=([^&]+)/);
     if (urlMatch) {
-      const extractedUrl = decodeURIComponent(urlMatch[1]);
-      if (enableLogging) console.log('Frontend URL extracted from state:', extractedUrl);
-      return extractedUrl;
+      try {
+        const extractedUrl = decodeURIComponent(urlMatch[1]);
+        if (enableLogging) console.log('✅ Frontend URL extracted from state:', extractedUrl);
+        return extractedUrl;
+      } catch (e) {
+        if (enableLogging) console.log('❌ Error decoding extracted URL:', e.message);
+      }
+    } else {
+      if (enableLogging) console.log('❌ No frontend_url match found in state');
     }
   }
   
   // Check Referer header as fallback for deployed environments
   const referer = req.get('Referer');
   if (referer && referer.includes('.onrender.com')) {
-    const refererUrl = new URL(referer);
-    const frontendUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
-    if (enableLogging) console.log('Frontend URL detected from Referer header:', frontendUrl);
-    return frontendUrl;
+    try {
+      const refererUrl = new URL(referer);
+      const frontendUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
+      if (enableLogging) console.log('✅ Frontend URL from Referer header:', frontendUrl);
+      return frontendUrl;
+    } catch (e) {
+      if (enableLogging) console.log('❌ Error parsing Referer header:', e.message);
+    }
   }
   
   // Environment-based detection
   if (process.env.FRONTEND_URL) {
-    if (enableLogging) console.log('Using FRONTEND_URL environment variable');
+    if (enableLogging) console.log('✅ Frontend URL from environment variable:', process.env.FRONTEND_URL);
     return process.env.FRONTEND_URL;
   }
   
   // Legacy state parameter support
   if (state === 'dev' || state === 'development' || process.env.DEV_MODE === 'true') {
-    if (enableLogging) console.log('Development environment detected');
+    if (enableLogging) console.log('✅ Development environment detected');
     return 'https://localhost:3000';
   }
   
+  // Enhanced production state detection
   if (state === 'prod' || state === 'production' || (state && state.startsWith('prod'))) {
-    if (enableLogging) console.log('Production environment detected');
+    if (enableLogging) console.log('✅ Production environment detected (legacy)');
     return 'https://vikings-eventmgmt.onrender.com';
   }
   
   // Default fallback
-  if (enableLogging) console.log('Using default production frontend URL');
+  if (enableLogging) console.log('⚠️ Using default production frontend URL');
   return 'https://vikings-eventmgmt.onrender.com';
 };
 
@@ -141,22 +166,29 @@ app.get('/oauth/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query;
     
-    console.log('OAuth callback received:', { 
+    console.log('🔗 OAuth callback received:', { 
       code: code ? code.substring(0, 20) + '...' : 'none', 
       state, 
       error,
-      fullQuery: req.query 
+      fullQuery: req.query,
+      referer: req.get('Referer'),
+      userAgent: req.get('User-Agent')
     });
+    
+    // Debug the frontend URL determination
+    console.log('🎯 Determining frontend URL for redirect...');
+    const frontendUrl = getFrontendUrl(req, {enableLogging: true});
+    console.log('🚀 Final frontend URL selected:', frontendUrl);
     
     
     if (error) {
       console.error('OAuth error from OSM:', error);
-      return res.redirect(`${getFrontendUrl(req, {enableLogging: true})}?error=${error}`);
+      return res.redirect(`${frontendUrl}?error=${error}`);
     }
     
     if (!code) {
       console.error('No authorization code received');
-      return res.redirect(`${getFrontendUrl(req, {enableLogging: true})}?error=no_code`);
+      return res.redirect(`${frontendUrl}?error=no_code`);
     }
 
     console.log('Attempting token exchange with OSM...');
@@ -194,14 +226,14 @@ app.get('/oauth/callback', async (req, res) => {
     
     if (!tokenResponse.ok) {
       console.error('Token exchange failed:', tokenData);
-      return res.redirect(`${getFrontendUrl(req, {enableLogging: true})}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
+      return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
     }
 
     console.log('Token exchange successful, redirecting to frontend...');
     
     // Redirect to frontend auth-success page with token as URL parameter
     // This allows the frontend to store the token in sessionStorage on the correct domain
-    const frontendUrl = getFrontendUrl(req, {enableLogging: true});
+    console.log('🎯 Redirecting to:', `${frontendUrl}/auth-success.html`);
     res.redirect(`${frontendUrl}/auth-success.html?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
     
   } catch (error) {
