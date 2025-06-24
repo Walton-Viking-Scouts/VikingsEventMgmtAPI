@@ -433,6 +433,7 @@ const getFlexiStructure = async (req, res) => {
             const osmInfo = getOSMRateLimitInfo(sessionId);
             return res.status(429).json({ 
                 error: 'OSM API rate limit exceeded',
+                
                 rateLimitInfo: osmInfo,
                 message: 'Please wait before making more requests'
             });
@@ -551,28 +552,56 @@ const updateFlexiRecord = async (req, res) => {
     const { sectionid, scoutid, flexirecordid, columnid, value } = req.body;
     const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
+    
+    // Enhanced validation
     if (!access_token || !sectionid || !scoutid || !flexirecordid || !columnid || value === undefined) {
+        console.error('updateFlexiRecord: Missing required parameters', {
+            hasToken: !!access_token,
+            sectionid, scoutid, flexirecordid, columnid, value
+        });
         return res.status(400).json({ error: 'Missing required parameters' });
     }
     
+    // Validate field ID format (should be f_1, f_2, etc.)
+    if (!columnid.match(/^f_\d+$/)) {
+        console.error('updateFlexiRecord: Invalid columnid format', { columnid });
+        return res.status(400).json({ error: 'Invalid field ID format. Expected format: f_1, f_2, etc.' });
+    }
+    
+    console.log('updateFlexiRecord: Request parameters', {
+        sectionid, scoutid, flexirecordid, columnid, 
+        valueLength: value.length,
+        sessionId: sessionId.substring(0, 8) + '...'
+    });
+    
     try {
+        const requestBody = new URLSearchParams({
+            sectionid: sectionid,
+            scoutid: scoutid,
+            extraid: flexirecordid,
+            columnid: columnid,
+            value: value
+        });
+        
+        console.log('updateFlexiRecord: Sending request to OSM', {
+            url: 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateRecord',
+            bodyString: requestBody.toString()
+        });
+        
         const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateRecord', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${access_token}`,
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: new URLSearchParams({
-                sectionid: sectionid,
-                scoutid: scoutid,
-                extraid: flexirecordid,
-                columnid: columnid,
-                value: value
-            })
+            body: requestBody
         }, sessionId);
+        
+        console.log('updateFlexiRecord: OSM response status', response.status);
         
         if (response.status === 429) {
             const osmInfo = getOSMRateLimitInfo(sessionId);
+            console.warn('updateFlexiRecord: Rate limit exceeded', osmInfo);
             return res.status(429).json({ 
                 error: 'OSM API rate limit exceeded',
                 rateLimitInfo: osmInfo,
@@ -580,7 +609,22 @@ const updateFlexiRecord = async (req, res) => {
             });
         }
         
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('updateFlexiRecord: OSM API error', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText
+            });
+            return res.status(response.status).json({ 
+                error: `OSM API error: ${response.status}`,
+                details: errorText
+            });
+        }
+        
         const data = await response.json();
+        console.log('updateFlexiRecord: Success', { success: data.ok || data.status });
+        
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
     } catch (err) {
