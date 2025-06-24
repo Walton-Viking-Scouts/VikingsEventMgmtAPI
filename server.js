@@ -104,13 +104,41 @@ if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
     app.use(Sentry.Handlers.tracingHandler());
 }
 
-// Update CORS configuration to allow localhost and production frontend
+// Dynamic CORS configuration to allow production, localhost, and specific PR previews
 app.use(cors({
-  origin: [
-    'https://vikings-eventmgmt.onrender.com',  // Production frontend
-    'https://localhost:3000',                  // Development frontend (https)
-    'http://localhost:3000'                    // Development frontend (http)
-  ],
+  origin: (origin, callback) => {
+    console.log('🔍 CORS check for origin:', origin);
+    
+    // Allow requests with no origin (mobile apps, postman, etc.)
+    if (!origin) {
+      console.log('✅ CORS: No origin header, allowing');
+      return callback(null, true);
+    }
+    
+    // Define allowed origins
+    const allowedOrigins = [
+      'https://vikings-eventmgmt.onrender.com',  // Production frontend
+      'https://localhost:3000',                  // Development frontend (https)
+      'http://localhost:3000'                    // Development frontend (http)
+    ];
+    
+    // Check exact matches first
+    if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS: Origin allowed (exact match):', origin);
+      return callback(null, true);
+    }
+    
+    // Allow specific PR preview URLs: https://vikings-event-management-front-end-pr-{number}.onrender.com
+    const prPreviewPattern = /^https:\/\/vikings-event-management-front-end-pr-\d+\.onrender\.com$/;
+    if (prPreviewPattern.test(origin)) {
+      console.log('✅ CORS: Origin allowed (PR preview):', origin);
+      return callback(null, true);
+    }
+    
+    // Reject all other origins
+    console.log('❌ CORS: Origin rejected:', origin);
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
