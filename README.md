@@ -31,6 +31,9 @@ Backend API for Vikings OSM Event Manager with rate limiting and OAuth integrati
 - ✅ Comprehensive test suite
 - ✅ Environment variable configuration
 - ✅ Automated CI/CD with GitHub Actions
+- ✅ Sentry structured logging and error monitoring
+- ✅ Enhanced flexi record management with validation
+- ✅ Camp groups sign-in/out functionality
 
 ## Setup
 
@@ -54,6 +57,8 @@ Backend API for Vikings OSM Event Manager with rate limiting and OAuth integrati
    OAUTH_CLIENT_SECRET=your_osm_client_secret
    NODE_ENV=development
    PORT=3000
+   SENTRY_DSN=your_sentry_dsn_optional
+   BACKEND_URL=http://localhost:3000
    ```
 
 4. **Run the server**
@@ -99,17 +104,18 @@ npm run test:ci       # CI mode (no watch, with coverage)
 - `GET /rate-limit-status` - Get current rate limit status
 
 ### OSM API Proxy
-- `POST /get-terms` - Get terms
-- `POST /get-section-config` - Get section configuration
-- `POST /get-user-roles` - Get user roles
-- `POST /get-events` - Get events
-- `POST /get-event-attendance` - Get event attendance
+- `GET /get-terms` - Get terms
+- `GET /get-section-config` - Get section configuration  
+- `GET /get-user-roles` - Get user roles
+- `GET /get-events` - Get events
+- `GET /get-event-attendance` - Get event attendance
 - `GET /get-contact-details` - Get contact details
 - `GET /get-list-of-members` - Get list of members
 - `GET /get-flexi-records` - Get flexi records
 - `GET /get-flexi-structure` - Get flexi record structure
 - `GET /get-single-flexi-record` - Get single flexi record
-- `POST /update-flexi-record` - Update flexi record
+- `GET /get-startup-data` - Get user startup data
+- `POST /update-flexi-record` - Update flexi record (with enhanced validation)
 
 ## Rate Limiting
 
@@ -138,6 +144,33 @@ Rate limit information is included in all API responses:
 }
 ```
 
+## Sentry Logging
+
+The application includes comprehensive structured logging using Sentry:
+
+### Configuration
+- **Structured Logging**: Enabled with `_experiments: { enableLogs: true }`
+- **Console Integration**: Automatically captures console.log/error/warn
+- **Error Monitoring**: OSM-specific context and rate limit information
+- **Performance Profiling**: Enabled in production environments
+
+### Usage
+```javascript
+const Sentry = require('./config/sentry');
+const { logger } = Sentry;
+
+logger.info('Operation completed', { endpoint: '/api/endpoint', userId: '123' });
+logger.error('API error', { error: err.message, stack: err.stack });
+logger.warn('Rate limit warning', { remaining: 10, limit: 100 });
+```
+
+### Enhanced updateFlexiRecord Logging
+- Request validation with parameter logging
+- OSM API request/response tracking  
+- Rate limit monitoring and warnings
+- Error context with full stack traces
+- Success confirmation with operation details
+
 ## Development
 
 ### Project Structure
@@ -148,11 +181,19 @@ Rate limit information is included in all API responses:
 │   └── integration.test.js   # Integration tests
 ├── .github/workflows/
 │   └── ci.yml               # GitHub Actions workflow
+├── config/
+│   └── sentry.js            # Sentry configuration with structured logging
+├── controllers/
+│   ├── auth.js              # OAuth authentication endpoints
+│   └── osm.js               # OSM API proxy with enhanced logging
+├── middleware/
+│   └── rateLimiting.js      # Dual-layer rate limiting
 ├── server.js                # Main server file
 ├── package.json
 ├── jest.config.json
 ├── .env.example
 ├── .gitignore
+├── CLAUDE.md                # Development guidance
 └── README.md
 ```
 
