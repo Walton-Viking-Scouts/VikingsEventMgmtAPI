@@ -121,14 +121,24 @@ describe('Vikings OSM Backend API', () => {
       expect(response.body.error).toContain('flexirecordid');
     });
 
-    test('OAuth callback should require authorization code', async () => {
+    test('OAuth debug endpoint should provide configuration info', async () => {
       const response = await request(app)
-        .post('/callback')
-        .send({})
-        .expect(400);
+        .get('/oauth/debug')
+        .expect(200);
 
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toContain('Authorization code required');
+      expect(response.body).toHaveProperty('clientId');
+      expect(response.body).toHaveProperty('clientSecret');
+      expect(response.body).toHaveProperty('frontendUrl');
+    });
+
+    test('OAuth callback should handle missing authorization code', async () => {
+      const response = await request(app)
+        .get('/oauth/callback')
+        .query({})
+        .expect(302); // Should redirect on error
+
+      // Should redirect to frontend with error
+      expect(response.headers.location).toContain('error=no_code');
     });
   });
 
@@ -152,6 +162,15 @@ describe('Vikings OSM Backend API', () => {
       expect(process.env.OAUTH_CLIENT_SECRET).toBeDefined();
       expect(process.env.OAUTH_CLIENT_SECRET).not.toBe('');
       expect(process.env.OAUTH_CLIENT_SECRET.length).toBeGreaterThan(10); // OAuth secrets should be reasonably long
+    });
+
+    test('OAuth debug endpoint with state parameter', async () => {
+      const response = await request(app)
+        .get('/oauth/debug?state=dev')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('stateParam', 'dev');
+      expect(response.body.frontendUrl).toContain('localhost');
     });
   });
 });

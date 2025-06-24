@@ -60,5 +60,14 @@ describe('Integration Tests', () => {
       expect(response.body._rateLimitInfo).toHaveProperty('backend');
       expect(response.body._rateLimitInfo).toHaveProperty('osm');
     });
+
+    test('should handle OAuth debug endpoint', async () => {
+      const response = await request(app)
+        .get('/oauth/debug')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('clientId');
+      expect(response.body).toHaveProperty('frontendUrl');
+    });
   });
 });
