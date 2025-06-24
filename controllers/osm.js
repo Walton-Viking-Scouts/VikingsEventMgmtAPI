@@ -521,7 +521,23 @@ const getStartupData = async (req, res) => {
             });
         }
         
-        const data = await response.json();
+        const text = await response.text();
+        console.log('Startup API response (first 50 chars):', text.substring(0, 50));
+        
+        // OSM startup endpoint returns JavaScript code, not JSON
+        // Remove first 18 characters to get the JSON data
+        const jsonText = text.substring(18);
+        console.log('After removing first 18 chars:', jsonText.substring(0, 50));
+        
+        let data;
+        try {
+            data = JSON.parse(jsonText);
+        } catch (e) {
+            console.error('JSON parse error after substring:', e);
+            console.error('Text being parsed:', jsonText.substring(0, 200));
+            return res.status(502).json({ error: 'Upstream returned invalid JSON', details: jsonText.substring(0, 500) });
+        }
+        
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
     } catch (err) {
