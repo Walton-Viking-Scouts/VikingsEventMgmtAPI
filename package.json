@@ -10,7 +10,13 @@
     "test": "NODE_ENV=test jest",
     "test:watch": "NODE_ENV=test jest --watch",
     "test:coverage": "NODE_ENV=test jest --coverage",
-    "test:ci": "NODE_ENV=test jest --ci --coverage --watchAll=false"
+    "test:ci": "NODE_ENV=test jest --ci --coverage --watchAll=false",
+    "version:patch": "npm version patch && git push && git push --tags",
+    "version:minor": "npm version minor && git push && git push --tags",
+    "version:major": "npm version major && git push && git push --tags",
+    "release:patch": "npm run test && npm run version:patch",
+    "release:minor": "npm run test && npm run version:minor",
+    "release:major": "npm run test && npm run version:major"
   },
   "keywords": [
     "osm",

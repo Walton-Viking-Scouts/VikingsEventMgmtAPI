@@ -15,6 +15,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run test:coverage` - Run tests with coverage report
 - `npm run test:ci` - Run tests in CI mode (no watch, with coverage)
 
+### Version Management
+- `npm run version:patch` - Bump patch version, commit, and push with tags
+- `npm run version:minor` - Bump minor version, commit, and push with tags
+- `npm run version:major` - Bump major version, commit, and push with tags
+- `npm run release:patch` - Run tests, then bump patch version
+- `npm run release:minor` - Run tests, then bump minor version
+- `npm run release:major` - Run tests, then bump major version
+
 Test configuration uses Jest with Node.js environment, 15-second timeout, and single worker to prevent port conflicts.
 
 ## Architecture Overview
