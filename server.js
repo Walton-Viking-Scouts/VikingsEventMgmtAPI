@@ -172,6 +172,7 @@ app.get('/get-flexi-records', osmController.getFlexiRecords);
 app.get('/get-flexi-structure', osmController.getFlexiStructure);
 app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
 app.post('/update-flexi-record', osmController.updateFlexiRecord);
+app.get('/get-startup-data', osmController.getStartupData);
 
 // Add OAuth environment validation endpoint for debugging
 app.get('/oauth/debug', (req, res) => {

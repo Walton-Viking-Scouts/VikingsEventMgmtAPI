@@ -495,6 +495,41 @@ const getSingleFlexiRecord = async (req, res) => {
     }
 };
 
+// Get user startup data including name and roles
+const getStartupData = async (req, res) => {
+    const access_token = req.headers.authorization?.replace('Bearer ', '');
+    const sessionId = getSessionId(req);
+    
+    if (!access_token) {
+        return res.status(401).json({ error: 'Access token is required in Authorization header' });
+    }
+    
+    try {
+        const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/ext/generic/startup/?action=getData', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${access_token}`
+            }
+        }, sessionId);
+        
+        if (response.status === 429) {
+            const osmInfo = getOSMRateLimitInfo(sessionId);
+            return res.status(429).json({ 
+                error: 'OSM API rate limit exceeded',
+                rateLimitInfo: osmInfo,
+                message: 'Please wait before making more requests'
+            });
+        }
+        
+        const data = await response.json();
+        const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
+        res.json(responseWithRateInfo);
+    } catch (err) {
+        console.error('Error in /get-startup-data:', err);
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    }
+};
+
 // Proxy updateFlexiRecord to avoid CORS
 const updateFlexiRecord = async (req, res) => {
     const { sectionid, scoutid, flexirecordid, columnid, value } = req.body;
@@ -550,5 +585,6 @@ module.exports = {
     getFlexiRecords,
     getFlexiStructure,
     getSingleFlexiRecord,
-    updateFlexiRecord
+    updateFlexiRecord,
+    getStartupData
 };
