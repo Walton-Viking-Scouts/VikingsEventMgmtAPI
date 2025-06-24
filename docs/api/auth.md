@@ -58,10 +58,10 @@ Include the obtained `access_token` in the `Authorization` header for all calls 
 
 These endpoints are part of the backend's API.
 
-### Get Current Token (Associated with Legacy Session)
+### Get Current Token
 
 *   **Endpoint:** `GET /token`
-*   **Purpose:** Retrieves the access token if a session (cookie-based, from POST `/callback`) is active.
+*   **Purpose:** Retrieves the access token if a session (cookie-based) is active.
 *   **Response (Success `200 OK`):**
     ```json
     {
@@ -72,7 +72,7 @@ These endpoints are part of the backend's API.
     ```
 *   **Note:** This is less relevant if using the primary `GET /oauth/callback` flow where the token is managed client-side.
 
-### Logout (Legacy Session)
+### Logout
 
 *   **Endpoint:** `POST /logout`
 *   **Purpose:** Clears the server-side session cookie. For the main OAuth flow, client-side token deletion is the primary logout mechanism.
@@ -81,23 +81,25 @@ These endpoints are part of the backend's API.
     { "success": true, "message": "Logged out successfully" }
     ```
 
-## Legacy Authentication Endpoints
+## Debug Endpoint
 
-These are older or alternative flows. **The `GET /oauth/callback` flow is recommended.**
+### OAuth Debug Information
 
-### Legacy OAuth Callback (POST)
-
-*   **Endpoint:** `POST /callback`
-*   **Purpose:** Exchanges `code` for token, stores token in server-side memory, and sets a `session_id` cookie.
-*   **Request Body (JSON):** `{ "code": "...", "redirect_uri": "..." }`
-*   **Response (Success `200 OK`):** Sets `session_id` cookie. `{ "success": true, "sessionId": "...", "expires_in": ... }`
-
-### Legacy Exchange Token (POST)
-
-*   **Endpoint:** `POST /exchange-token`
-*   **Purpose:** Directly exchanges an authorization `code` for an OSM access token. This is effectively what the backend does internally in other callback flows.
-*   **Request Body (JSON):** `{ "code": "...", "redirect_uri": "..." }`
-*   **Response (Success `200 OK`):** OSM token response: `{ "access_token": "...", "token_type": "Bearer", ... }`
+*   **Endpoint:** `GET /oauth/debug`
+*   **Purpose:** Provides debugging information about OAuth configuration and environment settings.
+*   **Query Parameters:**
+    *   `state` (optional): Test state parameter for frontend URL detection (e.g., `dev` or `prod`)
+*   **Response (Success `200 OK`):**
+    ```json
+    {
+      "clientId": "Set",
+      "clientSecret": "Set", 
+      "frontendUrl": "https://localhost:3000",
+      "stateParam": "dev",
+      "nodeEnv": "production",
+      "backendUrl": "https://vikings-osm-event-manager.onrender.com"
+    }
+    ```
 
 ## Security Notes:
 

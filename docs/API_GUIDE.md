@@ -8,9 +8,10 @@ This API serves as a backend proxy and authentication layer for interacting with
 
 Key features include:
 
-*   OAuth2 authentication with Online Scout Manager.
+*   OAuth2 authentication with Online Scout Manager using state-based frontend detection.
 *   Proxy endpoints for common OSM API calls, handling CORS and adding a layer for rate limiting.
 *   Rate limiting for both backend and OSM API requests.
+*   Secure token handling with automatic frontend redirection.
 
 ## Getting Started
 
@@ -23,8 +24,6 @@ Key features include:
 The API is structured into several main parts:
 
 *   **Base URL**: All endpoint paths described in the linked guides should be appended to the API's base URL (e.g., `https://your-backend-api.com/api/v1` or similar, depending on deployment).
-
-*   **Authentication Endpoints**: Used to manage the OAuth2 flow and token retrieval.
 
 *   **Authentication Endpoints**: Used to manage the OAuth2 flow and token retrieval.
 *   **OSM Proxy Endpoints**: Endpoints that mirror or facilitate calls to the Online Scout Manager API.

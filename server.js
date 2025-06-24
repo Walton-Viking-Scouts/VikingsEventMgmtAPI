@@ -46,10 +46,8 @@ app.use(backendRateLimit); // Apply rate limiting middleware to all routes
 app.get('/rate-limit-status', osmController.getRateLimitStatus);
 
 // OAuth/Authentication endpoints
-app.post('/callback', authController.oauthCallback);
 app.get('/token', authController.getCurrentToken);
 app.post('/logout', authController.logout);
-app.post('/exchange-token', authController.exchangeToken); // Legacy endpoint
 
 // OSM API proxy endpoints (with rate limiting)
 app.get('/get-terms', osmController.getTerms); // Updated to GET
@@ -237,7 +235,7 @@ if (process.env.NODE_ENV !== 'test') {
         console.log(`🏠 Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log('📋 Available endpoints:');
         console.log('Auth:');
-        console.log('- POST /callback');
+        console.log('- GET /oauth/callback (OAuth redirect from OSM)');
         console.log('- GET /token');
         console.log('- POST /logout');
         console.log('Rate Monitoring:');
