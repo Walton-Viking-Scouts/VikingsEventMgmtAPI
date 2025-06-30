@@ -7,12 +7,12 @@ The backend OAuth callback uses the `state` parameter to determine which fronten
 
 **For Development (localhost):**
 ```javascript
-const authUrl = `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent('https://vikings-osm-event-manager.onrender.com/oauth/callback')}&state=dev&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`;
+const authUrl = `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent('https://vikings-osm-backend.onrender.com/oauth/callback')}&state=dev&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`;
 ```
 
 **For Production:**
 ```javascript
-const authUrl = `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent('https://vikings-osm-event-manager.onrender.com/oauth/callback')}&state=prod&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`;
+const authUrl = `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent('https://vikings-osm-backend.onrender.com/oauth/callback')}&state=prod&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`;
 ```
 
 ## Backend Logic
@@ -26,7 +26,7 @@ const getFrontendUrl = () => {
 ```
 
 ## OSM Application Settings
-Callback URL: `https://vikings-osm-event-manager.onrender.com/oauth/callback`
+Callback URL: `https://vikings-osm-backend.onrender.com/oauth/callback`
 
 ## Testing
 - Test development: `https://backend.com/oauth/debug?state=dev`

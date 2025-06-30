@@ -25,6 +25,6 @@ The OAuth flow has been simplified to use only the backend-handled callback:
 - `state=prod` → Redirects to production frontend
 
 ### OSM Application Configuration:
-- Callback URL: `https://vikings-osm-event-manager.onrender.com/oauth/callback`
+- Callback URL: `https://vikings-osm-backend.onrender.com/oauth/callback`
 
 The codebase is now cleaner with only the active OAuth implementation.
