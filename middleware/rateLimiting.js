@@ -77,7 +77,7 @@ const backendRateLimit = (req, res, next) => {
         log.warn(log.fmt`Backend Rate Limit Exceeded: ${req.path}`, {
             endpoint: req.path,
             method: req.method,
-            identifier: identifier,
+            identifier: sessionId,
             clientIp: req.ip || req.connection?.remoteAddress,
             userAgent: req.headers['user-agent'],
             rateLimitInfo: {
