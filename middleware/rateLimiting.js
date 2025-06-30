@@ -1,3 +1,14 @@
+// Import Sentry logging
+const { Sentry, logger } = require('../config/sentry');
+const fallbackLogger = {
+    info: console.log,
+    warn: console.warn,
+    error: console.error,
+    debug: console.log,
+    fmt: (strings, ...values) => strings.reduce((result, string, i) => result + string + (values[i] || ''), '')
+};
+const log = logger || fallbackLogger;
+
 // Rate limiting tracking for our backend
 const rateLimitTracker = new Map();
 const BACKEND_RATE_LIMIT_WINDOW = 60000; // 1 minute window
@@ -62,6 +73,24 @@ const backendRateLimit = (req, res, next) => {
 
     // If the user has exceeded the rate limit, return a 429 response
     if (userLimits.requests.length >= MAX_REQUESTS_PER_WINDOW) {
+        // Log backend rate limiting
+        log.warn(log.fmt`Backend Rate Limit Exceeded: ${req.path}`, {
+            endpoint: req.path,
+            method: req.method,
+            identifier: identifier,
+            clientIp: req.ip || req.connection?.remoteAddress,
+            userAgent: req.headers['user-agent'],
+            rateLimitInfo: {
+                limit: MAX_REQUESTS_PER_WINDOW,
+                remaining: 0,
+                reset: resetTime,
+                window: 'per minute',
+                requestCount: userLimits.requests.length
+            },
+            section: 'backend-rate-limit',
+            timestamp: new Date().toISOString()
+        });
+        
         return res.status(429).json({
             error: 'Rate limit exceeded. Please try again later.',
             rateLimit: {
@@ -91,7 +120,18 @@ const shouldAllowOSMRequest = (sessionId) => {
         if (osmInfo.reset && now < osmInfo.reset * 1000) {
             return false; // Still rate limited
         } else {
-            // Reset expired, allow request
+            // Reset expired, allow request - log recovery
+            log.info(log.fmt`OSM Rate Limit Recovery: Session ${sessionId}`, {
+                sessionId,
+                rateLimitInfo: {
+                    previousLimit: osmInfo.limit,
+                    resetTime: osmInfo.reset,
+                    wasRateLimited: true
+                },
+                section: 'osm-rate-limit',
+                timestamp: new Date().toISOString()
+            });
+            
             osmInfo.rateLimited = false;
             osmInfo.retryAfter = null;
         }
@@ -106,6 +146,24 @@ const makeOSMRequest = async (url, options = {}, sessionId = null) => {
     // Check rate limits before making request
     if (sessionId && !shouldAllowOSMRequest(sessionId)) {
         const osmInfo = osmRateLimitTracker.get(sessionId);
+        
+        // Log proactive OSM rate limit blocking
+        log.warn(log.fmt`OSM Proactive Rate Limit Block: ${url}`, {
+            url,
+            sessionId,
+            method: options.method || 'GET',
+            rateLimitInfo: {
+                rateLimited: osmInfo.rateLimited,
+                remaining: osmInfo.remaining,
+                reset: osmInfo.reset,
+                retryAfter: osmInfo.retryAfter,
+                limit: osmInfo.limit
+            },
+            reason: osmInfo.rateLimited ? 'Still in cooldown period' : 'No remaining requests',
+            section: 'osm-rate-limit',
+            timestamp: new Date().toISOString()
+        });
+        
         const response = new Response(JSON.stringify({
             error: 'Rate limited',
             retryAfter: osmInfo.retryAfter
@@ -122,7 +180,7 @@ const makeOSMRequest = async (url, options = {}, sessionId = null) => {
     
     // Store OSM rate limit info per user session
     if (sessionId && (limit || remaining || reset)) {
-        osmRateLimitTracker.set(sessionId, {
+        const newRateLimitInfo = {
             limit: limit ? parseInt(limit) : null,
             remaining: remaining ? parseInt(remaining) : null,
             reset: reset ? parseInt(reset) : null,
@@ -130,15 +188,25 @@ const makeOSMRequest = async (url, options = {}, sessionId = null) => {
             retryAfter: response.status === 429 ? 
                 response.headers.get('Retry-After') || 3600 : null,
             lastUpdated: Date.now()
-        });
+        };
+        
+        osmRateLimitTracker.set(sessionId, newRateLimitInfo);
+        
+        // Log rate limit info updates (debug level)
+        if (remaining !== null) {
+            log.debug(log.fmt`OSM Rate Limit Info Updated: ${url}`, {
+                url,
+                sessionId,
+                rateLimitInfo: newRateLimitInfo,
+                section: 'osm-rate-limit',
+                timestamp: new Date().toISOString()
+            });
+        }
     }
-    
-    // Log response status
-    console.log(`OSM API Response: ${response.status} for ${url}`);
     
     // Handle rate limiting response
     if (response.status === 429) {
-        console.log('OSM API rate limit hit');
+        // This will be handled by the OSM controller logging
         const retryAfter = response.headers.get('Retry-After') || '3600';
         console.log(`Retry after: ${retryAfter} seconds`);
     }

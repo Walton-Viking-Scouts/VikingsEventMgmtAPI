@@ -6,7 +6,7 @@ const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 // Initialize Sentry
-const Sentry = require('./config/sentry');
+const { Sentry, logger } = require('./config/sentry');
 
 // Import middleware and controllers
 const { backendRateLimit } = require('./middleware/rateLimiting');
@@ -98,10 +98,11 @@ const getFrontendUrl = (req, options = {}) => {
   return 'https://vikings-eventmgmt.onrender.com';
 };
 
-// Sentry request handler (must be first middleware)
+// Sentry request handler (must be first middleware) - v9 API handles this automatically
 if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
-    app.use(Sentry.Handlers.requestHandler());
-    app.use(Sentry.Handlers.tracingHandler());
+    console.log('✅ Sentry request handlers added via expressIntegration');
+} else {
+    console.log('⚠️ Sentry request handlers NOT added - Sentry:', !!Sentry, 'DSN:', !!process.env.SENTRY_DSN, 'ENV:', process.env.NODE_ENV);
 }
 
 // Dynamic CORS configuration to allow production, localhost, and specific PR previews
@@ -173,6 +174,87 @@ app.get('/get-flexi-structure', osmController.getFlexiStructure);
 app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
 app.post('/update-flexi-record', osmController.updateFlexiRecord);
 app.get('/get-startup-data', osmController.getStartupData);
+
+// Sentry test endpoint
+app.get('/test-sentry', (req, res) => {
+  // Test different types of errors
+  const testType = req.query.type || 'error';
+  
+  switch (testType) {
+    case 'error':
+      throw new Error('Test error for Sentry - this is expected!');
+    case 'message':
+      if (Sentry) {
+        Sentry.captureMessage('Test message from backend', 'info');
+      }
+      res.json({ message: 'Test message sent to Sentry' });
+      break;
+    case 'exception':
+      if (Sentry) {
+        Sentry.captureException(new Error('Test exception for Sentry'));
+      }
+      res.json({ message: 'Test exception sent to Sentry' });
+      break;
+    default:
+      res.json({ 
+        message: 'Sentry test endpoint',
+        usage: '?type=error|message|exception',
+        sentryEnabled: !!Sentry && !!process.env.SENTRY_DSN,
+        debug: {
+          sentryObject: !!Sentry,
+          dsn: process.env.SENTRY_DSN ? 'Set' : 'Missing',
+          nodeEnv: process.env.NODE_ENV,
+          testEnv: process.env.NODE_ENV === 'test'
+        }
+      });
+  }
+});
+
+// Rate limiting test endpoint for development
+app.get('/test-rate-limits', (req, res) => {
+  const testType = req.query.type || 'info';
+  
+  switch (testType) {
+    case 'backend-stress':
+      // This will trigger backend rate limiting after multiple requests
+      res.json({ 
+        message: 'Backend stress test - make 100+ requests rapidly to trigger rate limit',
+        endpoint: '/test-rate-limits?type=backend-stress',
+        tip: 'Use: for i in {1..105}; do curl "http://localhost:3000/test-rate-limits?type=backend-stress" & done'
+      });
+      break;
+      
+    case 'osm-simulation':
+      // Simulate OSM rate limit info
+      res.set({
+        'X-RateLimit-Limit': '1000',
+        'X-RateLimit-Remaining': '5',
+        'X-RateLimit-Reset': Math.floor(Date.now() / 1000) + 3600
+      });
+      res.json({ 
+        message: 'OSM rate limit simulation - low remaining requests',
+        rateLimitHeaders: {
+          limit: 1000,
+          remaining: 5,
+          reset: Math.floor(Date.now() / 1000) + 3600
+        }
+      });
+      break;
+      
+    default:
+      res.json({
+        message: 'Rate limiting test endpoint',
+        usage: {
+          'backend-stress': 'Test backend rate limiting (100 req/min)',
+          'osm-simulation': 'Simulate OSM rate limit headers'
+        },
+        currentLimits: {
+          backend: '100 requests per minute per user/IP',
+          osm: 'Dynamic based on OSM API responses'
+        }
+      });
+  }
+});
 
 // Add OAuth environment validation endpoint for debugging
 app.get('/oauth/debug', (req, res) => {
@@ -277,20 +359,13 @@ app.get('/oauth/callback', async (req, res) => {
 
 // Sentry error handler (must be after all other middleware and routes)
 if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
-    app.use(Sentry.Handlers.errorHandler({
-        shouldHandleError(error) {
-            return error.status >= 400;
-        }
-    }));
+    Sentry.setupExpressErrorHandler(app);
+    console.log('✅ Sentry error handler added');
 }
 
 // Global error handler (fallback)
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
-    
-    if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
-        Sentry.captureException(err);
-    }
     
     res.status(500).json({ 
         error: 'Internal Server Error',
@@ -307,9 +382,33 @@ app.use((err, req, res, next) => {
 if (process.env.NODE_ENV !== 'test') {
     const PORT = process.env.PORT || 3000;
     const server = app.listen(PORT, () => {
+        // Console logging for immediate feedback
         console.log('✅ Vikings OSM Backend Server Started');
         console.log(`🌐 Server running on port ${PORT}`);
         console.log(`🏠 Environment: ${process.env.NODE_ENV || 'development'}`);
+        
+        // Structured Sentry logging for monitoring
+        if (logger) {
+            logger.info("Vikings OSM Backend Server Started", {
+                environment: process.env.NODE_ENV || 'development',
+                port: PORT,
+                timestamp: new Date().toISOString(),
+                configuration: {
+                    sentryEnabled: !!Sentry,
+                    sentryDsn: !!process.env.SENTRY_DSN,
+                    oauthConfigured: !!(process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET),
+                    corsEnabled: true,
+                    rateLimitingEnabled: true
+                },
+                server: {
+                    nodeVersion: process.version,
+                    platform: process.platform,
+                    architecture: process.arch
+                },
+                section: 'server-startup'
+            });
+        }
+        
         console.log('📋 Available endpoints:');
         console.log('Auth:');
         console.log('- GET /oauth/callback (OAuth redirect from OSM)');

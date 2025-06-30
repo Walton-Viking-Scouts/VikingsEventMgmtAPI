@@ -10,8 +10,15 @@ const {
 } = require('../middleware/rateLimiting');
 
 // Import Sentry for structured logging
-const Sentry = require('../config/sentry');
-const { logger } = Sentry || { logger: console }; // Fallback to console if Sentry not available
+const { Sentry, logger } = require('../config/sentry');
+const fallbackLogger = {
+    info: console.log,
+    warn: console.warn,
+    error: console.error,
+    debug: console.log,
+    fmt: (strings, ...values) => strings.reduce((result, string, i) => result + string + (values[i] || ''), '')
+};
+const log = logger || fallbackLogger;
 
 // Rate limit status endpoint for frontend monitoring (needs access to rateLimitTracker)
 const getRateLimitStatus = (req, res) => {
@@ -62,13 +69,35 @@ const getRateLimitStatus = (req, res) => {
 const getTerms = async (req, res) => {
     const access_token = req.headers.authorization?.replace('Bearer ', '');
     const sessionId = getSessionId(req);
+    const endpoint = 'getTerms';
+    const osmUrl = 'https://www.onlinescoutmanager.co.uk/api.php?action=getTerms';
+    const requestId = `${sessionId}-${Date.now()}`;
+    
+    // Pre-call logging
+    log.info(log.fmt`OSM API Request: ${endpoint}`, {
+        endpoint,
+        requestId,
+        sessionId,
+        hasToken: !!access_token,
+        clientIp: req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        timestamp: new Date().toISOString(),
+        section: 'osm-api'
+    });
     
     if (!access_token) {
+        log.warn(log.fmt`OSM API Request Failed: ${endpoint} - Missing token`, {
+            endpoint,
+            requestId,
+            sessionId,
+            error: 'No authorization token provided',
+            section: 'osm-api'
+        });
         return res.status(401).json({ error: 'Access token is required in Authorization header' });
     }
 
     try {
-        const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/api.php?action=getTerms`, {
+        const response = await makeOSMRequest(osmUrl, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${access_token}`,
@@ -78,6 +107,14 @@ const getTerms = async (req, res) => {
         
         if (response.status === 429) {
             const osmInfo = getOSMRateLimitInfo(sessionId);
+            log.warn(log.fmt`OSM API Rate Limited: ${endpoint}`, {
+                endpoint,
+                requestId,
+                sessionId,
+                status: response.status,
+                rateLimitInfo: osmInfo,
+                section: 'osm-api'
+            });
             return res.status(429).json({ 
                 error: 'OSM API rate limit exceeded',
                 rateLimitInfo: osmInfo,
@@ -86,14 +123,28 @@ const getTerms = async (req, res) => {
         }
         
         if (!response.ok) {
-            console.error(`OSM API error: ${response.status} ${response.statusText}`);
+            log.error(log.fmt`OSM API Error: ${endpoint}`, {
+                endpoint,
+                requestId,
+                sessionId,
+                status: response.status,
+                statusText: response.statusText,
+                error: `OSM API error: ${response.status}`,
+                section: 'osm-api'
+            });
             return res.status(response.status).json({ error: `OSM API error: ${response.status}` });
         }
         
         const responseText = await response.text();
         
         if (!responseText.trim()) {
-            console.error('Empty response from OSM API');
+            log.error(log.fmt`OSM API Empty Response: ${endpoint}`, {
+                endpoint,
+                requestId,
+                sessionId,
+                error: 'Empty response from OSM API',
+                section: 'osm-api'
+            });
             return res.status(500).json({ error: 'Empty response from OSM API' });
         }
         
@@ -101,14 +152,42 @@ const getTerms = async (req, res) => {
         try {
             data = JSON.parse(responseText);
         } catch (parseError) {
-            console.error('JSON parse error:', parseError);
+            log.error(log.fmt`OSM API Parse Error: ${endpoint}`, {
+                endpoint,
+                requestId,
+                sessionId,
+                error: 'JSON parse error',
+                parseError: parseError.message,
+                responseLength: responseText.length,
+                section: 'osm-api'
+            });
             return res.status(500).json({ error: 'Invalid JSON response from OSM API' });
         }
+        
+        // Success logging
+        log.info(log.fmt`OSM API Success: ${endpoint}`, {
+            endpoint,
+            requestId,
+            sessionId,
+            status: response.status,
+            responseSize: responseText.length,
+            hasData: !!data,
+            dataKeys: data ? Object.keys(data) : [],
+            rateLimitInfo: getOSMRateLimitInfo(sessionId),
+            section: 'osm-api'
+        });
         
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
     } catch (err) {
-        console.error('Error in /get-terms:', err);
+        log.error(log.fmt`OSM API Exception: ${endpoint}`, {
+            endpoint,
+            requestId,
+            sessionId,
+            error: err.message,
+            stack: err.stack,
+            section: 'osm-api'
+        });
         res.status(500).json({ error: 'Internal Server Error', details: err.message });
     }
 };

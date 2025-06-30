@@ -1,6 +1,4 @@
-const express = require('express');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
+// Note: express, cors, cookieParser imports removed as they're not needed in this config file
 
 // Load environment variables
 require('dotenv').config();
@@ -9,7 +7,7 @@ require('dotenv').config();
 let Sentry;
 try {
     Sentry = require('@sentry/node');
-    const { ProfilingIntegration } = require('@sentry/profiling-node');
+    const { nodeProfilingIntegration } = require('@sentry/profiling-node');
     
     // Initialize Sentry
     if (process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
@@ -17,11 +15,11 @@ try {
             dsn: process.env.SENTRY_DSN,
             environment: process.env.NODE_ENV || 'development',
             integrations: [
-                new Sentry.Integrations.Http({ tracing: true }),
-                new Sentry.Integrations.Express({ app: express() }),
-                new ProfilingIntegration(),
+                Sentry.httpIntegration({ tracing: true }),
+                Sentry.expressIntegration(),
+                nodeProfilingIntegration(),
                 // Send console.log, console.error, and console.warn calls as logs to Sentry
-                Sentry.consoleLoggingIntegration({ levels: ["log", "error", "warn"] }),
+                Sentry.consoleIntegration({ levels: ["log", "error", "warn"] }),
             ],
             tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
             profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
@@ -51,4 +49,7 @@ try {
     Sentry = null;
 }
 
-module.exports = Sentry;
+module.exports = { 
+    Sentry, 
+    logger: Sentry?.logger || null 
+};
