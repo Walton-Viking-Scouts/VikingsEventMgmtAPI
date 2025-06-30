@@ -25,8 +25,8 @@ This section covers miscellaneous helper or debugging endpoints available in the
         "frontendUrl": "https://vikings-eventmgmt.onrender.com", // Or "https://localhost:3000" if state=dev
         "stateParam": "Not set", // Or the value of the 'state' query parameter if provided
         "nodeEnv": "production", // Or "development"
-        "backendUrl": "https://vikings-osm-event-manager.onrender.com", // Backend's configured URL
-        "authUrl": "https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=https%3A%2F%2Fvikings-osm-event-manager.onrender.com%2Foauth%2Fcallback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code"
+        "backendUrl": "https://vikings-osm-backend.onrender.com", // Backend's configured URL
+        "authUrl": "https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=https%3A%2F%2Fvikings-osm-backend.onrender.com%2Foauth%2Fcallback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code"
         // The authUrl is constructed using the backend's environment variables.
         // Replace YOUR_CLIENT_ID with the actual client ID.
     }

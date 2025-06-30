@@ -97,7 +97,7 @@ These endpoints are part of the backend's API.
       "frontendUrl": "https://localhost:3000",
       "stateParam": "dev",
       "nodeEnv": "production",
-      "backendUrl": "https://vikings-osm-event-manager.onrender.com"
+      "backendUrl": "https://vikings-osm-backend.onrender.com"
     }
     ```
 
