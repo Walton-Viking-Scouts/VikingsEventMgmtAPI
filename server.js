@@ -15,6 +15,10 @@ const { backendRateLimit } = require('./middleware/rateLimiting');
 const authController = require('./controllers/auth');
 const osmController = require('./controllers/osm');
 
+// Import Swagger documentation
+const { specs, swaggerUi } = require('./docs/swagger');
+const osmApiDocs = require('./docs/osm-api/swagger');
+
 const app = express();
 
 // Centralized frontend URL determination utility
@@ -158,6 +162,46 @@ app.use(backendRateLimit); // Apply rate limiting middleware to all routes
 // ========================================
 // ROUTES - Using imported controllers
 // ========================================
+
+// API Documentation endpoints
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "Vikings OSM Backend API Documentation",
+  customfavIcon: "/favicon.ico",
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    filter: true,
+    showExtensions: true,
+    showCommonExtensions: true,
+  },
+}));
+
+// Serve OpenAPI spec as JSON
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(specs);
+});
+
+// OSM API Documentation endpoints
+app.use('/osm-api-docs', osmApiDocs.swaggerUi.serve, osmApiDocs.swaggerUi.setup(osmApiDocs.specs, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "OSM API Documentation (Unofficial)",
+  customfavIcon: "/favicon.ico",
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    filter: true,
+    showExtensions: true,
+    showCommonExtensions: true,
+  },
+}));
+
+// Serve OSM API OpenAPI spec as JSON
+app.get('/osm-api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(osmApiDocs.specs);
+});
 
 // Rate limit monitoring endpoint
 app.get('/rate-limit-status', osmController.getRateLimitStatus);
@@ -437,8 +481,14 @@ if (process.env.NODE_ENV !== 'test') {
       }
         
       console.log('📋 Available endpoints:');
+      console.log('Documentation:');
+      console.log('- GET /api-docs (Interactive API Documentation)');
+      console.log('- GET /api-docs.json (OpenAPI Specification)');
+      console.log('- GET /osm-api-docs (OSM API Documentation - Unofficial)');
+      console.log('- GET /osm-api-docs.json (OSM API OpenAPI Specification)');
       console.log('Auth:');
       console.log('- GET /oauth/callback (OAuth redirect from OSM)');
+      console.log('- GET /oauth/debug (OAuth configuration debug)');
       console.log('- GET /token');
       console.log('- POST /logout');
       console.log('Rate Monitoring:');
