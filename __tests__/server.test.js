@@ -16,11 +16,11 @@ global.fetch = jest.fn(() =>
   Promise.resolve({
     status: 200,
     headers: {
-      get: jest.fn(() => null)
+      get: jest.fn(() => null),
     },
     json: () => Promise.resolve({ data: 'test' }),
-    text: () => Promise.resolve('test response')
-  })
+    text: () => Promise.resolve('test response'),
+  }),
 );
 
 // Import server AFTER mocking setInterval
@@ -62,8 +62,8 @@ describe('Vikings OSM Backend API', () => {
     // Test for rate limit headers
     it('should add rate limit headers to API responses', async () => {
       const response = await request(app)
-          .get('/rate-limit-status')
-          .set('Authorization', 'Bearer test_token');
+        .get('/rate-limit-status')
+        .set('Authorization', 'Bearer test_token');
 
       console.log('Response headers:', response.headers);
 
@@ -75,14 +75,14 @@ describe('Vikings OSM Backend API', () => {
     // Test for decrementing remaining count
     it('should decrement remaining count on each request', async () => {
       const response1 = await request(app)
-          .get('/rate-limit-status')
-          .set('Authorization', 'Bearer test_token');
+        .get('/rate-limit-status')
+        .set('Authorization', 'Bearer test_token');
 
       const remaining1 = parseInt(response1.headers['x-backend-ratelimit-remaining']);
 
       const response2 = await request(app)
-          .get('/rate-limit-status')
-          .set('Authorization', 'Bearer test_token');
+        .get('/rate-limit-status')
+        .set('Authorization', 'Bearer test_token');
 
       const remaining2 = parseInt(response2.headers['x-backend-ratelimit-remaining']);
 
