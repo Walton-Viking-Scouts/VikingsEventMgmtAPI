@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const https = require('https');
+const fs = require('fs');
 
 // Load environment variables
 require('dotenv').config();
@@ -43,7 +45,7 @@ const getFrontendUrl = (req, options = {}) => {
       // Try decoding in case the state itself is URL encoded
       decodedState = decodeURIComponent(state);
       if (enableLogging) console.log('🔍 Decoded state:', decodedState);
-    } catch (e) {
+    } catch (_e) {
       if (enableLogging) console.log('🔍 State not URL encoded, using as-is');
     }
     
@@ -54,8 +56,8 @@ const getFrontendUrl = (req, options = {}) => {
         const extractedUrl = decodeURIComponent(urlMatch[1]);
         if (enableLogging) console.log('✅ Frontend URL extracted from state:', extractedUrl);
         return extractedUrl;
-      } catch (e) {
-        if (enableLogging) console.log('❌ Error decoding extracted URL:', e.message);
+      } catch (_e) {
+        if (enableLogging) console.log('❌ Error decoding extracted URL:', _e.message);
       }
     } else {
       if (enableLogging) console.log('❌ No frontend_url match found in state');
@@ -70,8 +72,8 @@ const getFrontendUrl = (req, options = {}) => {
       const frontendUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
       if (enableLogging) console.log('✅ Frontend URL from Referer header:', frontendUrl);
       return frontendUrl;
-    } catch (e) {
-      if (enableLogging) console.log('❌ Error parsing Referer header:', e.message);
+    } catch (_e) {
+      if (enableLogging) console.log('❌ Error parsing Referer header:', _e.message);
     }
   }
   
@@ -100,9 +102,9 @@ const getFrontendUrl = (req, options = {}) => {
 
 // Sentry request handler (must be first middleware) - v9 API handles this automatically
 if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
-    console.log('✅ Sentry request handlers added via expressIntegration');
+  console.log('✅ Sentry request handlers added via expressIntegration');
 } else {
-    console.log('⚠️ Sentry request handlers NOT added - Sentry:', !!Sentry, 'DSN:', !!process.env.SENTRY_DSN, 'ENV:', process.env.NODE_ENV);
+  console.log('⚠️ Sentry request handlers NOT added - Sentry:', !!Sentry, 'DSN:', !!process.env.SENTRY_DSN, 'ENV:', process.env.NODE_ENV);
 }
 
 // Dynamic CORS configuration to allow production, localhost, and specific PR previews
@@ -118,9 +120,12 @@ app.use(cors({
     
     // Define allowed origins
     const allowedOrigins = [
-      'https://vikings-eventmgmt.onrender.com',  // Production frontend
-      'https://localhost:3000',                  // Development frontend (https)
-      'http://localhost:3000'                    // Development frontend (http)
+      'https://vikings-eventmgmt.onrender.com',  // Production frontend (vanilla)
+      'https://vikingeventmgmt.onrender.com',    // Production frontend (React mobile)
+      'https://localhost:3000',                  // Development frontend (vanilla)
+      'http://localhost:3000',                   // Development frontend (vanilla - http)
+      'https://localhost:3001',                  // Development frontend (React mobile)
+      'http://localhost:3001',                    // Development frontend (React mobile - http)
     ];
     
     // Check exact matches first
@@ -143,7 +148,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 }));
 
 app.use(express.json());
@@ -181,32 +186,32 @@ app.get('/test-sentry', (req, res) => {
   const testType = req.query.type || 'error';
   
   switch (testType) {
-    case 'error':
-      throw new Error('Test error for Sentry - this is expected!');
-    case 'message':
-      if (Sentry) {
-        Sentry.captureMessage('Test message from backend', 'info');
-      }
-      res.json({ message: 'Test message sent to Sentry' });
-      break;
-    case 'exception':
-      if (Sentry) {
-        Sentry.captureException(new Error('Test exception for Sentry'));
-      }
-      res.json({ message: 'Test exception sent to Sentry' });
-      break;
-    default:
-      res.json({ 
-        message: 'Sentry test endpoint',
-        usage: '?type=error|message|exception',
-        sentryEnabled: !!Sentry && !!process.env.SENTRY_DSN,
-        debug: {
-          sentryObject: !!Sentry,
-          dsn: process.env.SENTRY_DSN ? 'Set' : 'Missing',
-          nodeEnv: process.env.NODE_ENV,
-          testEnv: process.env.NODE_ENV === 'test'
-        }
-      });
+  case 'error':
+    throw new Error('Test error for Sentry - this is expected!');
+  case 'message':
+    if (Sentry) {
+      Sentry.captureMessage('Test message from backend', 'info');
+    }
+    res.json({ message: 'Test message sent to Sentry' });
+    break;
+  case 'exception':
+    if (Sentry) {
+      Sentry.captureException(new Error('Test exception for Sentry'));
+    }
+    res.json({ message: 'Test exception sent to Sentry' });
+    break;
+  default:
+    res.json({ 
+      message: 'Sentry test endpoint',
+      usage: '?type=error|message|exception',
+      sentryEnabled: !!Sentry && !!process.env.SENTRY_DSN,
+      debug: {
+        sentryObject: !!Sentry,
+        dsn: process.env.SENTRY_DSN ? 'Set' : 'Missing',
+        nodeEnv: process.env.NODE_ENV,
+        testEnv: process.env.NODE_ENV === 'test',
+      },
+    });
   }
 });
 
@@ -215,44 +220,44 @@ app.get('/test-rate-limits', (req, res) => {
   const testType = req.query.type || 'info';
   
   switch (testType) {
-    case 'backend-stress':
-      // This will trigger backend rate limiting after multiple requests
-      res.json({ 
-        message: 'Backend stress test - make 100+ requests rapidly to trigger rate limit',
-        endpoint: '/test-rate-limits?type=backend-stress',
-        tip: 'Use: for i in {1..105}; do curl "http://localhost:3000/test-rate-limits?type=backend-stress" & done'
-      });
-      break;
+  case 'backend-stress':
+    // This will trigger backend rate limiting after multiple requests
+    res.json({ 
+      message: 'Backend stress test - make 100+ requests rapidly to trigger rate limit',
+      endpoint: '/test-rate-limits?type=backend-stress',
+      tip: 'Use: for i in {1..105}; do curl "http://localhost:3000/test-rate-limits?type=backend-stress" & done',
+    });
+    break;
       
-    case 'osm-simulation':
-      // Simulate OSM rate limit info
-      res.set({
-        'X-RateLimit-Limit': '1000',
-        'X-RateLimit-Remaining': '5',
-        'X-RateLimit-Reset': Math.floor(Date.now() / 1000) + 3600
-      });
-      res.json({ 
-        message: 'OSM rate limit simulation - low remaining requests',
-        rateLimitHeaders: {
-          limit: 1000,
-          remaining: 5,
-          reset: Math.floor(Date.now() / 1000) + 3600
-        }
-      });
-      break;
+  case 'osm-simulation':
+    // Simulate OSM rate limit info
+    res.set({
+      'X-RateLimit-Limit': '1000',
+      'X-RateLimit-Remaining': '5',
+      'X-RateLimit-Reset': Math.floor(Date.now() / 1000) + 3600,
+    });
+    res.json({ 
+      message: 'OSM rate limit simulation - low remaining requests',
+      rateLimitHeaders: {
+        limit: 1000,
+        remaining: 5,
+        reset: Math.floor(Date.now() / 1000) + 3600,
+      },
+    });
+    break;
       
-    default:
-      res.json({
-        message: 'Rate limiting test endpoint',
-        usage: {
-          'backend-stress': 'Test backend rate limiting (100 req/min)',
-          'osm-simulation': 'Simulate OSM rate limit headers'
-        },
-        currentLimits: {
-          backend: '100 requests per minute per user/IP',
-          osm: 'Dynamic based on OSM API responses'
-        }
-      });
+  default:
+    res.json({
+      message: 'Rate limiting test endpoint',
+      usage: {
+        'backend-stress': 'Test backend rate limiting (100 req/min)',
+        'osm-simulation': 'Simulate OSM rate limit headers',
+      },
+      currentLimits: {
+        backend: '100 requests per minute per user/IP',
+        osm: 'Dynamic based on OSM API responses',
+      },
+    });
   }
 });
 
@@ -267,7 +272,7 @@ app.get('/oauth/debug', (req, res) => {
     refererHeader: req.get('Referer') || 'Not set',
     nodeEnv: process.env.NODE_ENV || 'Not set',
     backendUrl: process.env.BACKEND_URL || 'Not set',
-    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`
+    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`,
   });
 });
 
@@ -281,9 +286,9 @@ app.get('/oauth/callback', async (req, res) => {
       code: code ? code.substring(0, 20) + '...' : 'none', 
       state, 
       error,
-      fullQuery: req.query,
+      hasCode: !!code,
       referer: req.get('Referer'),
-      userAgent: req.get('User-Agent')
+      userAgent: req.get('User-Agent'),
     });
     
     // Debug the frontend URL determination
@@ -310,13 +315,13 @@ app.get('/oauth/callback', async (req, res) => {
       client_id: process.env.OAUTH_CLIENT_ID,
       client_secret: process.env.OAUTH_CLIENT_SECRET,
       code: code,
-      redirect_uri: `${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`
+      redirect_uri: `${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`,
     };
     
     console.log('Token exchange payload:', {
       ...tokenPayload,
       client_secret: '***hidden***',
-      code: code.substring(0, 20) + '...'
+      code: code.substring(0, 20) + '...',
     });
 
     const tokenResponse = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
@@ -324,7 +329,7 @@ app.get('/oauth/callback', async (req, res) => {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams(tokenPayload)
+      body: new URLSearchParams(tokenPayload),
     });
 
     console.log('Token response status:', tokenResponse.status);
@@ -332,7 +337,7 @@ app.get('/oauth/callback', async (req, res) => {
     const tokenData = await tokenResponse.json();
     console.log('Token response:', { 
       ...tokenData, 
-      access_token: tokenData.access_token ? tokenData.access_token.substring(0, 20) + '...' : 'none'
+      access_token: tokenData.access_token ? tokenData.access_token.substring(0, 20) + '...' : 'none',
     });
     
     if (!tokenResponse.ok) {
@@ -344,8 +349,8 @@ app.get('/oauth/callback', async (req, res) => {
     
     // Redirect to frontend auth-success page with token as URL parameter
     // This allows the frontend to store the token in sessionStorage on the correct domain
-    console.log('🎯 Redirecting to:', `${frontendUrl}/auth-success.html`);
-    res.redirect(`${frontendUrl}/auth-success.html?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
+    console.log('🎯 Redirecting to:', `${frontendUrl}/?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
+    res.redirect(`${frontendUrl}/?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`);
     
   } catch (error) {
     console.error('OAuth callback error:', error);
@@ -359,18 +364,18 @@ app.get('/oauth/callback', async (req, res) => {
 
 // Sentry error handler (must be after all other middleware and routes)
 if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
-    Sentry.setupExpressErrorHandler(app);
-    console.log('✅ Sentry error handler added');
+  Sentry.setupExpressErrorHandler(app);
+  console.log('✅ Sentry error handler added');
 }
 
 // Global error handler (fallback)
-app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
     
-    res.status(500).json({ 
-        error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-    });
+  res.status(500).json({ 
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong',
+  });
 });
 
 
@@ -380,63 +385,84 @@ app.use((err, req, res, next) => {
 
 // Only start server if not in test environment
 if (process.env.NODE_ENV !== 'test') {
-    const PORT = process.env.PORT || 3000;
-    const server = app.listen(PORT, () => {
-        // Console logging for immediate feedback
-        console.log('✅ Vikings OSM Backend Server Started');
-        console.log(`🌐 Server running on port ${PORT}`);
+  const PORT = process.env.PORT || 3000;
+    
+  // Use HTTPS in development, HTTP in production (Render handles SSL termination)
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      const httpsOptions = {
+        key: fs.readFileSync('./localhost-key.pem'),
+        cert: fs.readFileSync('./localhost.pem'),
+      };
+      https.createServer(httpsOptions, app).listen(PORT, () => {
+        console.log('✅ Vikings OSM Backend Server Started (HTTPS)');
+        console.log(`🔒 HTTPS Server running on port ${PORT}`);
         console.log(`🏠 Environment: ${process.env.NODE_ENV || 'development'}`);
+      });
+    } catch (_error) {
+      console.log('⚠️  SSL certificates not found, falling back to HTTP');
+      app.listen(PORT, () => {
+        console.log('✅ Vikings OSM Backend Server Started (HTTP)');
+        console.log(`🌐 HTTP Server running on port ${PORT}`);
+        console.log(`🏠 Environment: ${process.env.NODE_ENV || 'development'}`);
+      });
+    }
+  } else {
+    app.listen(PORT, () => {
+      // Console logging for immediate feedback
+      console.log('✅ Vikings OSM Backend Server Started');
+      console.log(`🌐 Server running on port ${PORT}`);
+      console.log(`🏠 Environment: ${process.env.NODE_ENV || 'development'}`);
         
-        // Structured Sentry logging for monitoring
-        if (logger) {
-            logger.info("Vikings OSM Backend Server Started", {
-                environment: process.env.NODE_ENV || 'development',
-                port: PORT,
-                timestamp: new Date().toISOString(),
-                configuration: {
-                    sentryEnabled: !!Sentry,
-                    sentryDsn: !!process.env.SENTRY_DSN,
-                    oauthConfigured: !!(process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET),
-                    corsEnabled: true,
-                    rateLimitingEnabled: true
-                },
-                server: {
-                    nodeVersion: process.version,
-                    platform: process.platform,
-                    architecture: process.arch
-                },
-                section: 'server-startup'
-            });
-        }
+      // Structured Sentry logging for monitoring
+      if (logger) {
+        logger.info('Vikings OSM Backend Server Started', {
+          environment: process.env.NODE_ENV || 'development',
+          port: PORT,
+          timestamp: new Date().toISOString(),
+          configuration: {
+            sentryEnabled: !!Sentry,
+            sentryDsn: !!process.env.SENTRY_DSN,
+            oauthConfigured: !!(process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET),
+            corsEnabled: true,
+            rateLimitingEnabled: true,
+          },
+          server: {
+            nodeVersion: process.version,
+            platform: process.platform,
+            architecture: process.arch,
+          },
+          section: 'server-startup',
+        });
+      }
         
-        console.log('📋 Available endpoints:');
-        console.log('Auth:');
-        console.log('- GET /oauth/callback (OAuth redirect from OSM)');
-        console.log('- GET /token');
-        console.log('- POST /logout');
-        console.log('Rate Monitoring:');
-        console.log('- GET /rate-limit-status');
-        console.log('OSM API Proxy:');
-        console.log('- GET /get-terms');
-        console.log('- GET /get-section-config');
-        console.log('- GET /get-user-roles');
-        console.log('- GET /get-events');
-        console.log('- GET /get-event-attendance');
-        console.log('- GET /get-contact-details');
-        console.log('- GET /get-list-of-members');
-        console.log('- GET /get-flexi-records');
-        console.log('- GET /get-flexi-structure');
-        console.log('- GET /get-single-flexi-record');
-        console.log('- POST /update-flexi-record');
+      console.log('📋 Available endpoints:');
+      console.log('Auth:');
+      console.log('- GET /oauth/callback (OAuth redirect from OSM)');
+      console.log('- GET /token');
+      console.log('- POST /logout');
+      console.log('Rate Monitoring:');
+      console.log('- GET /rate-limit-status');
+      console.log('OSM API Proxy:');
+      console.log('- GET /get-terms');
+      console.log('- GET /get-section-config');
+      console.log('- GET /get-user-roles');
+      console.log('- GET /get-events');
+      console.log('- GET /get-event-attendance');
+      console.log('- GET /get-contact-details');
+      console.log('- GET /get-list-of-members');
+      console.log('- GET /get-flexi-records');
+      console.log('- GET /get-flexi-structure');
+      console.log('- GET /get-single-flexi-record');
+      console.log('- POST /update-flexi-record');
     });
-
+        
     // Graceful shutdown
     process.on('SIGTERM', () => {
-        console.log('SIGTERM received, shutting down gracefully');
-        server.close(() => {
-            process.exit(0);
-        });
+      console.log('SIGTERM received, shutting down gracefully');
+      process.exit(0);
     });
+  }
 }
 
 // Export the app for testing

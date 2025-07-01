@@ -15,8 +15,8 @@ global.fetch = jest.fn(() =>
     status: 200,
     headers: { get: jest.fn(() => null) },
     json: () => Promise.resolve({ data: 'test' }),
-    text: () => Promise.resolve('test response')
-  })
+    text: () => Promise.resolve('test response'),
+  }),
 );
 
 // Import server AFTER mocking setInterval
@@ -33,7 +33,7 @@ describe('Integration Tests', () => {
   describe('Full API Flow', () => {
     test('should handle a complete user roles request', async () => {
       const mockResponse = {
-        roles: [{ sectionid: '123', section: 'Beavers' }]
+        roles: [{ sectionid: '123', section: 'Beavers' }],
       };
       
       fetch.mockResolvedValueOnce({
@@ -41,14 +41,14 @@ describe('Integration Tests', () => {
         headers: { 
           get: jest.fn((header) => {
             switch(header) {
-              case 'X-RateLimit-Limit': return '100';
-              case 'X-RateLimit-Remaining': return '99';
-              case 'X-RateLimit-Reset': return Math.floor(Date.now() / 1000) + 3600;
-              default: return null;
+            case 'X-RateLimit-Limit': return '100';
+            case 'X-RateLimit-Remaining': return '99';
+            case 'X-RateLimit-Reset': return Math.floor(Date.now() / 1000) + 3600;
+            default: return null;
             }
-          })
+          }),
         },
-        json: () => Promise.resolve(mockResponse)
+        json: () => Promise.resolve(mockResponse),
       });
 
       const response = await request(app)

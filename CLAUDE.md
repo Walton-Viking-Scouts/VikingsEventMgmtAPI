@@ -9,6 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev` - Start development server with auto-restart via nodemon
 - `npm run build` - No build step needed (returns echo message)
 
+### Code Quality
+- `npm run lint` - Run ESLint to check code style and catch errors
+
 ### Testing
 - `npm test` - Run all tests
 - `npm run test:watch` - Run tests in watch mode for development
