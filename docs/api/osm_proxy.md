@@ -450,3 +450,115 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
     *   `502 Bad Gateway`.
 
 ---
+
+## 11. Get Members Grid
+
+*   **Endpoint:** `POST /get-members-grid`
+*   **Description:** Retrieves member contact information from OSM and transforms the raw data structure into a more usable format with properly labeled contact groups and fields. This endpoint parses the OSM metadata to map numeric column IDs to readable labels and organizes contact information by groups (e.g., Primary Contact 1, Emergency Contact).
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+    *   `Content-Type: application/json` (Required)
+*   **Request Body:**
+    ```json
+    {
+        "section_id": "SECTION_ID", // The ID of the section
+        "term_id": "TERM_ID" // The ID of the term
+    }
+    ```
+*   **Example Request:**
+    ```bash
+    curl -X POST "https://your-backend-api.com/get-members-grid" \
+         -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+         -H "Content-Type: application/json" \
+         -d '{
+               "section_id": "49097",
+               "term_id": "216843"
+             }'
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "status": true,
+        "data": {
+            "members": [
+                {
+                    "member_id": "311708",
+                    "first_name": "Luke",
+                    "last_name": "Hart",
+                    "age": "17 / 06",
+                    "patrol": "Young Leaders (YLs)",
+                    "patrol_id": -3,
+                    "active": true,
+                    "joined": "2024-10-12",
+                    "started": "2015-01-14",
+                    "end_date": null,
+                    "date_of_birth": "2007-12-02",
+                    "section_id": 49097,
+                    "contact_groups": {
+                        "Primary Contact 1": {
+                            "First Name": "Emma",
+                            "Last Name": "Hart",
+                            "Address 1": "Talisgrove House",
+                            "Email 1": "hart_emma@hotmail.com",
+                            "Phone 1": "07876187138"
+                        },
+                        "Primary Contact 2": {
+                            "First Name": "Christopher",
+                            "Last Name": "Pratt",
+                            "Address 1": "Talisgrove House",
+                            "Email 1": "ChristopherP@waltonviking.uk",
+                            "Phone 1": "07747025678"
+                        }
+                    }
+                }
+            ],
+            "metadata": {
+                "contact_groups": [
+                    {
+                        "group_id": 1,
+                        "name": "Primary Contact 1",
+                        "identifier": "contact_primary_1",
+                        "columns": [
+                            {
+                                "column_id": 2,
+                                "label": "First Name",
+                                "type": "text",
+                                "varname": "firstname"
+                            },
+                            {
+                                "column_id": 3,
+                                "label": "Last Name",
+                                "type": "text",
+                                "varname": "lastname"
+                            }
+                        ]
+                    }
+                ],
+                "column_mapping": {
+                    "1_2": {
+                        "label": "First Name",
+                        "type": "text",
+                        "varname": "firstname",
+                        "group_name": "Primary Contact 1"
+                    }
+                }
+            }
+        },
+        "_rateLimitInfo": {
+            // Rate limit information
+        }
+    }
+    ```
+*   **Key Features:**
+    *   **Data Transformation**: Converts OSM's raw numeric column IDs (e.g., "1_2") to readable labels (e.g., "First Name")
+    *   **Contact Groups**: Organizes contact information by relationship type (Primary Contact 1, Emergency Contact, etc.)
+    *   **Metadata**: Includes comprehensive metadata about the contact group structure for frontend processing
+    *   **Type Information**: Preserves field type information (text, email, telephone) for proper handling
+*   **Potential Error Responses:**
+    *   `400 Bad Request`: If section_id or term_id are missing from the request body.
+    *   `401 Unauthorized`: If the access token is missing or invalid.
+    *   `429 Too Many Requests`: If rate limits are exceeded.
+    *   `500 Internal Server Error`: If there's an error processing the OSM data or transformation fails.
+    *   `502 Bad Gateway`: If the OSM API is unavailable or returns invalid data.
+
+---

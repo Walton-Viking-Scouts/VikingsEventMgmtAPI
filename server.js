@@ -16,8 +16,13 @@ const authController = require('./controllers/auth');
 const osmController = require('./controllers/osm');
 
 // Import Swagger documentation
-const { specs, swaggerUi } = require('./docs/swagger');
-const osmApiDocs = require('./docs/osm-api/swagger');
+const frontendApiDocs = require('./docs/frontend-api/swagger');
+// Temporarily disable OSM docs to fix conflicts
+// const osmApiDocs = require('./docs/osm-api/swagger');
+
+// Successfully loaded documentation
+console.log('✅ Frontend API docs loaded:', frontendApiDocs.specs.info.title, '(' + Object.keys(frontendApiDocs.specs.paths).length + ' endpoints)');
+// console.log('✅ OSM API docs loaded:', osmApiDocs.specs.info.title, '(' + Object.keys(osmApiDocs.specs.paths).length + ' endpoints)');
 
 const app = express();
 
@@ -163,45 +168,42 @@ app.use(backendRateLimit); // Apply rate limiting middleware to all routes
 // ROUTES - Using imported controllers
 // ========================================
 
-// API Documentation endpoints
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "Vikings OSM Backend API Documentation",
-  customfavIcon: "/favicon.ico",
-  swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-    filter: true,
-    showExtensions: true,
-    showCommonExtensions: true,
-  },
+// Backend API Documentation endpoints - Clean setup
+const swaggerUi = require('swagger-ui-express');
+app.use('/backend-docs', swaggerUi.serve);
+app.get('/backend-docs', swaggerUi.setup(frontendApiDocs.specs, {
+  customSiteTitle: 'Vikings OSM Backend API Documentation',
+  explorer: false,
 }));
 
-// Serve OpenAPI spec as JSON
+
+// Serve Backend API OpenAPI spec as JSON
+app.get('/backend-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(frontendApiDocs.specs);
+});
+
+// Keep old endpoint for backward compatibility
 app.get('/api-docs.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  res.send(specs);
+  res.send(frontendApiDocs.specs);
 });
 
-// OSM API Documentation endpoints
-app.use('/osm-api-docs', osmApiDocs.swaggerUi.serve, osmApiDocs.swaggerUi.setup(osmApiDocs.specs, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "OSM API Documentation (Unofficial)",
-  customfavIcon: "/favicon.ico",
-  swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-    filter: true,
-    showExtensions: true,
-    showCommonExtensions: true,
-  },
-}));
+// OSM API Documentation endpoints - DISABLED to fix conflicts
+// const osmApp = require('express')();
+// const osmSwaggerUi = require('swagger-ui-express');
+// osmApp.use('/static', osmSwaggerUi.serve);
+// osmApp.get('/', osmSwaggerUi.setup(osmApiDocs.specs, {
+//   customSiteTitle: 'OSM API Documentation (Unofficial)',
+//   explorer: false,
+// }));
+// app.use('/osm-api-docs', osmApp);
 
-// Serve OSM API OpenAPI spec as JSON
-app.get('/osm-api-docs.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.send(osmApiDocs.specs);
-});
+// // Serve OSM API OpenAPI spec as JSON
+// app.get('/osm-api-docs.json', (req, res) => {
+//   res.setHeader('Content-Type', 'application/json');
+//   res.send(osmApiDocs.specs);
+// });
 
 // Rate limit monitoring endpoint
 app.get('/rate-limit-status', osmController.getRateLimitStatus);
@@ -222,7 +224,9 @@ app.get('/get-flexi-records', osmController.getFlexiRecords);
 app.get('/get-flexi-structure', osmController.getFlexiStructure);
 app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
 app.post('/update-flexi-record', osmController.updateFlexiRecord);
+app.post('/multi-update-flexi-record', osmController.multiUpdateFlexiRecord);
 app.get('/get-startup-data', osmController.getStartupData);
+app.post('/get-members-grid', osmController.getMembersGrid);
 
 // Sentry test endpoint
 app.get('/test-sentry', (req, res) => {
@@ -482,8 +486,9 @@ if (process.env.NODE_ENV !== 'test') {
         
       console.log('📋 Available endpoints:');
       console.log('Documentation:');
-      console.log('- GET /api-docs (Interactive API Documentation)');
-      console.log('- GET /api-docs.json (OpenAPI Specification)');
+      console.log('- GET /backend-docs (Interactive Backend API Documentation)');
+      console.log('- GET /backend-docs.json (Backend API OpenAPI Specification)');
+      console.log('- GET /api-docs.json (Legacy Backend API OpenAPI Specification)');
       console.log('- GET /osm-api-docs (OSM API Documentation - Unofficial)');
       console.log('- GET /osm-api-docs.json (OSM API OpenAPI Specification)');
       console.log('Auth:');
@@ -505,6 +510,7 @@ if (process.env.NODE_ENV !== 'test') {
       console.log('- GET /get-flexi-structure');
       console.log('- GET /get-single-flexi-record');
       console.log('- POST /update-flexi-record');
+      console.log('- POST /get-members-grid');
     });
         
     // Graceful shutdown

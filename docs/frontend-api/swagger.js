@@ -113,8 +113,8 @@ const options = {
   },
   apis: [
     './controllers/*.js',
-    './docs/schemas/*.js',
-    './docs/endpoints/*.js',
+    './docs/frontend-api/schemas/*.js',
+    './docs/frontend-api/endpoints/*.js',
     './server.js',
   ],
 };

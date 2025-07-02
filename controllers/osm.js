@@ -629,6 +629,232 @@ const getStartupData = async (req, res) => {
   }
 };
 
+// Proxy getMembersGrid to avoid CORS and transform data structure
+const getMembersGrid = async (req, res) => {
+  const { section_id, term_id } = req.body;
+  const access_token = req.headers.authorization?.replace('Bearer ', '');
+  const sessionId = getSessionId(req);
+  const endpoint = 'getMembersGrid';
+  const requestId = `${sessionId}-${Date.now()}`;
+  
+  // Enhanced validation
+  if (!access_token || !section_id || !term_id) {
+    log.error(log.fmt`${endpoint}: Missing required parameters`, {
+      hasToken: !!access_token,
+      section_id, 
+      term_id,
+      endpoint,
+      requestId,
+      sessionId,
+    });
+    return res.status(400).json({ 
+      error: 'Missing required parameters: section_id and term_id are required, plus Authorization header', 
+    });
+  }
+  
+  log.info(log.fmt`${endpoint}: Processing request`, {
+    section_id, 
+    term_id,
+    sessionId: sessionId.substring(0, 8) + '...',
+    endpoint,
+    requestId,
+  });
+  
+  try {
+    const requestBody = new URLSearchParams({
+      section_id: section_id,
+      term_id: term_id,
+    });
+    
+    log.debug(log.fmt`${endpoint}: Sending request to OSM`, {
+      url: 'https://www.onlinescoutmanager.co.uk/ext/members/contact/grid/?action=getMembers',
+      bodyString: requestBody.toString(),
+      sessionId: sessionId.substring(0, 8) + '...',
+      endpoint,
+      requestId,
+    });
+    
+    const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/ext/members/contact/grid/?action=getMembers', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: requestBody,
+    }, sessionId);
+    
+    log.debug(log.fmt`${endpoint}: OSM response status: ${response.status}`, {
+      status: response.status,
+      endpoint,
+      requestId,
+      sessionId: sessionId.substring(0, 8) + '...',
+    });
+    
+    if (response.status === 429) {
+      const osmInfo = getOSMRateLimitInfo(sessionId);
+      log.warn(log.fmt`${endpoint}: Rate limit exceeded`, { 
+        ...osmInfo,
+        endpoint,
+        requestId,
+        sessionId: sessionId.substring(0, 8) + '...',
+      });
+      return res.status(429).json({ 
+        error: 'OSM API rate limit exceeded',
+        rateLimitInfo: osmInfo,
+        message: 'Please wait before making more requests',
+      });
+    }
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(log.fmt`${endpoint}: OSM API error`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        endpoint,
+        requestId,
+        sessionId: sessionId.substring(0, 8) + '...',
+      });
+      return res.status(response.status).json({ 
+        error: `OSM API error: ${response.status}`,
+        details: errorText,
+      });
+    }
+    
+    const rawData = await response.json();
+    
+    // Transform the data structure
+    const transformedData = transformMemberGridData(rawData);
+    
+    log.info(log.fmt`${endpoint}: Success`, { 
+      memberCount: transformedData.data?.members?.length || 0,
+      contactGroupCount: transformedData.data?.metadata?.contact_groups?.length || 0,
+      endpoint,
+      requestId,
+      sessionId: sessionId.substring(0, 8) + '...',
+    });
+    
+    const responseWithRateInfo = addRateLimitInfoToResponse(req, res, transformedData);
+    res.json(responseWithRateInfo);
+  } catch (err) {
+    log.error(log.fmt`${endpoint}: Internal server error`, {
+      error: err.message,
+      stack: err.stack,
+      endpoint,
+      requestId,
+      sessionId: sessionId.substring(0, 8) + '...',
+      section_id,
+      term_id,
+    });
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
+// Helper function to transform member grid data structure
+const transformMemberGridData = (rawData) => {
+  if (!rawData || !rawData.data || !rawData.meta) {
+    return {
+      status: false,
+      error: 'Invalid data structure from OSM API',
+      data: { members: [], metadata: { contact_groups: [] } },
+    };
+  }
+  
+  // Build column mapping from metadata
+  const columnMapping = {};
+  const contactGroups = [];
+  
+  if (rawData.meta.structure && Array.isArray(rawData.meta.structure)) {
+    rawData.meta.structure.forEach(group => {
+      if (group.columns && Array.isArray(group.columns)) {
+        const groupInfo = {
+          group_id: group.group_id,
+          name: group.name,
+          identifier: group.identifier,
+          columns: [],
+        };
+        
+        group.columns.forEach(column => {
+          const groupColumnId = `${group.group_id}_${column.column_id}`;
+          columnMapping[groupColumnId] = {
+            label: column.label,
+            type: column.type,
+            varname: column.varname,
+            group_name: group.name,
+          };
+          
+          groupInfo.columns.push({
+            column_id: column.column_id,
+            label: column.label,
+            type: column.type,
+            varname: column.varname,
+          });
+        });
+        
+        contactGroups.push(groupInfo);
+      }
+    });
+  }
+  
+  // Transform member data
+  const transformedMembers = [];
+  
+  Object.entries(rawData.data).forEach(([memberId, memberData]) => {
+    const transformedMember = {
+      member_id: memberId,
+      first_name: memberData.first_name || '',
+      last_name: memberData.last_name || '',
+      age: memberData.age || '',
+      patrol: memberData.patrol || '',
+      patrol_id: memberData.patrol_id,
+      active: memberData.active,
+      joined: memberData.joined,
+      started: memberData.started,
+      end_date: memberData.end_date,
+      date_of_birth: memberData.date_of_birth,
+      section_id: memberData.section_id,
+      contact_groups: {},
+    };
+    
+    // Transform custom_data using column mapping
+    if (memberData.custom_data) {
+      Object.entries(memberData.custom_data).forEach(([groupId, groupData]) => {
+        const groupInfo = contactGroups.find(g => g.group_id.toString() === groupId);
+        const groupName = groupInfo ? groupInfo.name : `Group ${groupId}`;
+        
+        if (!transformedMember.contact_groups[groupName]) {
+          transformedMember.contact_groups[groupName] = {};
+        }
+        
+        Object.entries(groupData).forEach(([columnId, value]) => {
+          const groupColumnId = `${groupId}_${columnId}`;
+          const columnInfo = columnMapping[groupColumnId];
+          
+          if (columnInfo) {
+            transformedMember.contact_groups[groupName][columnInfo.label] = value;
+          } else {
+            // Fallback for unmapped columns
+            transformedMember.contact_groups[groupName][`Column ${columnId}`] = value;
+          }
+        });
+      });
+    }
+    
+    transformedMembers.push(transformedMember);
+  });
+  
+  return {
+    status: true,
+    data: {
+      members: transformedMembers,
+      metadata: {
+        contact_groups: contactGroups,
+        column_mapping: columnMapping,
+      },
+    },
+  };
+};
+
 // Proxy updateFlexiRecord to avoid CORS
 const updateFlexiRecord = async (req, res) => {
   const { sectionid, scoutid, flexirecordid, columnid, value } = req.body;
@@ -748,6 +974,152 @@ const updateFlexiRecord = async (req, res) => {
   }
 };
 
+// Multi-update flexirecord endpoint (batch update multiple scouts)
+const multiUpdateFlexiRecord = async (req, res) => {
+  const { sectionid, scouts, value, column, flexirecordid } = req.body;
+  const access_token = req.headers.authorization?.replace('Bearer ', '');
+  const sessionId = getSessionId(req);
+  const endpoint = 'multiUpdateFlexiRecord';
+  const requestId = `${sessionId}-${Date.now()}`;
+    
+  // Enhanced validation
+  if (!access_token || !sectionid || !scouts || !Array.isArray(scouts) || value === undefined || !column || !flexirecordid) {
+    log.error(log.fmt`${endpoint}: Missing required parameters`, {
+      hasToken: !!access_token,
+      sectionid, 
+      scouts: Array.isArray(scouts) ? scouts.length : scouts,
+      value, 
+      column, 
+      flexirecordid,
+      endpoint,
+      requestId,
+      sessionId,
+    });
+    return res.status(400).json({ 
+      error: 'Missing required parameters: sectionid, scouts (array), value, column, flexirecordid are required, plus Authorization header', 
+    });
+  }
+    
+  // Validate scouts array
+  if (scouts.length === 0) {
+    log.error(log.fmt`${endpoint}: Empty scouts array`, { endpoint, requestId, sessionId });
+    return res.status(400).json({ error: 'scouts array cannot be empty' });
+  }
+    
+  // Validate field ID format (should be f_1, f_2, etc.)
+  if (!column.match(/^f_\d+$/)) {
+    log.error(log.fmt`${endpoint}: Invalid column format`, { 
+      column,
+      endpoint,
+      requestId,
+      sessionId,
+    });
+    return res.status(400).json({ error: 'Invalid field ID format. Expected format: f_1, f_2, etc.' });
+  }
+    
+  log.info(log.fmt`${endpoint}: Processing batch update`, {
+    sectionid, 
+    scoutCount: scouts.length,
+    scouts: scouts.slice(0, 5), // Log first 5 scout IDs for debugging
+    value: String(value).substring(0, 50), // Truncate long values
+    column, 
+    flexirecordid,
+    sessionId: sessionId.substring(0, 8) + '...',
+    endpoint,
+    requestId,
+  });
+    
+  try {
+    // Build form data for OSM API
+    const requestBody = new URLSearchParams({
+      scouts: JSON.stringify(scouts), // OSM expects JSON string array
+      value: value,
+      col: column, // OSM uses 'col' not 'column'
+      extraid: flexirecordid,
+    });
+        
+    log.debug(log.fmt`${endpoint}: Sending request to OSM`, {
+      url: `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=multiUpdate&sectionid=${sectionid}`,
+      bodyString: requestBody.toString(),
+      sessionId: sessionId.substring(0, 8) + '...',
+      endpoint,
+      requestId,
+    });
+        
+    const response = await makeOSMRequest(`https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=multiUpdate&sectionid=${sectionid}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: requestBody,
+    }, sessionId);
+        
+    log.debug(log.fmt`${endpoint}: OSM response status: ${response.status}`, {
+      status: response.status,
+      endpoint,
+      requestId,
+      sessionId: sessionId.substring(0, 8) + '...',
+    });
+        
+    if (response.status === 429) {
+      const osmInfo = getOSMRateLimitInfo(sessionId);
+      log.warn(log.fmt`${endpoint}: Rate limit exceeded`, { 
+        ...osmInfo,
+        endpoint,
+        requestId,
+        sessionId: sessionId.substring(0, 8) + '...',
+      });
+      return res.status(429).json({ 
+        error: 'OSM API rate limit exceeded',
+        rateLimitInfo: osmInfo,
+        message: 'Please wait before making more requests',
+      });
+    }
+        
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(log.fmt`${endpoint}: OSM API error`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        endpoint,
+        requestId,
+        sessionId: sessionId.substring(0, 8) + '...',
+      });
+      return res.status(response.status).json({ 
+        error: `OSM API error: ${response.status}`,
+        details: errorText,
+      });
+    }
+        
+    const data = await response.json();
+    log.info(log.fmt`${endpoint}: Success`, { 
+      success: data.ok || data.status,
+      updatedCount: scouts.length,
+      endpoint,
+      requestId,
+      sessionId: sessionId.substring(0, 8) + '...',
+    });
+        
+    const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
+    res.json(responseWithRateInfo);
+  } catch (err) {
+    log.error(log.fmt`${endpoint}: Internal server error`, {
+      error: err.message,
+      stack: err.stack,
+      endpoint,
+      requestId,
+      sessionId: sessionId.substring(0, 8) + '...',
+      sectionid,
+      scoutCount: scouts?.length,
+      column,
+      flexirecordid,
+    });
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
 module.exports = {
   getRateLimitStatus,
   getTerms,
@@ -761,5 +1133,7 @@ module.exports = {
   getFlexiStructure,
   getSingleFlexiRecord,
   updateFlexiRecord,
+  multiUpdateFlexiRecord,
   getStartupData,
+  getMembersGrid,
 };

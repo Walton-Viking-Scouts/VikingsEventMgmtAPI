@@ -525,4 +525,154 @@
  *         $ref: '#/components/responses/RateLimited'
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
+ * 
+ * /multi-update-flexi-record:
+ *   post:
+ *     summary: Batch update multiple scouts in a flexi record
+ *     description: |
+ *       Updates the same field value for multiple scouts in a single batch operation.
+ *       This is much more efficient than making individual update calls for each scout.
+ *       
+ *       **Key Features:**
+ *       - Batch processing for better performance
+ *       - Validates all scout IDs before processing
+ *       - Comprehensive error handling and logging
+ *       - Rate limit aware with detailed monitoring
+ *       - Field ID format validation (f_1, f_2, etc.)
+ *       
+ *       **Use Cases:**
+ *       - Marking attendance for multiple scouts
+ *       - Bulk awarding of badges or achievements
+ *       - Setting the same progress value for a group
+ *       - Administrative updates across members
+ *       
+ *       **Efficiency Benefits:**
+ *       - Single API call vs multiple individual calls
+ *       - Reduced rate limit consumption
+ *       - Atomic operation (all succeed or all fail)
+ *       - Better error handling for batch operations
+ *     tags: [Flexi Records]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/MultiUpdateFlexiRecordRequest'
+ *           examples:
+ *             attendance_update:
+ *               summary: Mark attendance for multiple scouts
+ *               value:
+ *                 sectionid: "49097"
+ *                 scouts: ["1601995", "2060746", "1809627"]
+ *                 value: "1"
+ *                 column: "f_1"
+ *                 flexirecordid: "72758"
+ *             badge_award:
+ *               summary: Award a badge to multiple scouts
+ *               value:
+ *                 sectionid: "49097"
+ *                 scouts: ["1601995", "2060746"]
+ *                 value: "Completed"
+ *                 column: "f_3"
+ *                 flexirecordid: "72758"
+ *     responses:
+ *       200:
+ *         description: Successfully updated flexi records for all scouts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     ok:
+ *                       type: boolean
+ *                       description: Update success status
+ *                       example: true
+ *                     status:
+ *                       type: string
+ *                       description: Update status message
+ *                       example: "Records updated successfully"
+ *                     updated_count:
+ *                       type: integer
+ *                       description: Number of scouts updated
+ *                       example: 3
+ *       400:
+ *         description: Invalid request parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Error'
+ *                 - type: object
+ *                   properties:
+ *                     error:
+ *                       oneOf:
+ *                         - type: string
+ *                           example: "Missing required parameters: sectionid, scouts (array), value, column, flexirecordid are required, plus Authorization header"
+ *                         - type: string
+ *                           example: "scouts array cannot be empty"
+ *                         - type: string
+ *                           example: "Invalid field ID format. Expected format: f_1, f_2, etc."
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * 
+ * /get-members-grid:
+ *   post:
+ *     summary: Get member contact grid with transformed structure
+ *     description: |
+ *       Retrieves member contact information from OSM and transforms the raw data structure
+ *       into a more usable format with properly labeled contact groups and fields.
+ *       
+ *       **Key Features:**
+ *       - Transforms raw OSM custom_data into labeled contact groups
+ *       - Parses metadata to map column IDs to readable labels
+ *       - Organizes contact information by groups (Primary Contact 1, Emergency Contact, etc.)
+ *       - Preserves all core member information (name, age, patrol, etc.)
+ *       - Includes comprehensive metadata for frontend processing
+ *       
+ *       **Data Transformation:**
+ *       - Raw numeric keys (1_2, 1_3) become readable labels (First Name, Last Name)
+ *       - Contact data is grouped by relationship type
+ *       - Column metadata includes type information (text, email, telephone)
+ *     tags: [OSM Data]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/MembersGridRequest'
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved and transformed member contact data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/MembersGridResponse'
+ *       400:
+ *         description: Missing required parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Error'
+ *                 - type: object
+ *                   properties:
+ *                     error:
+ *                       example: "Missing required parameters: section_id and term_id are required, plus Authorization header"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
