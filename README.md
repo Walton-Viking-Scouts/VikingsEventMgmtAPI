@@ -1,27 +1,6 @@
-# OSM Tracker
+# Vikings Event Management API
 
-OSM Event Management Tracker - A web application for managing Online Scout Manager events and attendance.
-
-## Features
-
-- OAuth authentication with OSM
-- Section and event selection
-- Attendance tracking with filtering
-- Export capabilities
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm start
-```
-
-# Vikings OSM Backend
-
-Backend API for Vikings OSM Event Manager with rate limiting and OAuth integration.
+Backend API for Vikings Event Management with rate limiting and OAuth integration.
 
 ## Features
 
@@ -41,8 +20,8 @@ Backend API for Vikings OSM Event Manager with rate limiting and OAuth integrati
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
-   cd vikings-osm-backend
+   git clone https://github.com/Walton-Viking-Scouts/VikingsEventMgmtAPI.git
+   cd VikingsEventMgmtAPI
    ```
 
 2. **Install dependencies**
@@ -175,7 +154,7 @@ logger.warn('Rate limit warning', { remaining: 10, limit: 100 });
 
 ### Project Structure
 ```
-/vikings-osm-backend/
+/VikingsEventMgmtAPI/
 ├── __tests__/
 │   ├── server.test.js        # Unit tests
 │   └── integration.test.js   # Integration tests

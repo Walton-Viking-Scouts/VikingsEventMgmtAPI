@@ -1,8 +1,16 @@
 {
-  "name": "vikings-osm-backend",
+  "name": "vikings-event-mgmt-api",
   "version": "1.1.0",
-  "description": "Backend API for Vikings OSM Event Manager with rate limiting and OAuth",
+  "description": "Backend API for Vikings Event Management with rate limiting and OAuth",
   "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Walton-Viking-Scouts/VikingsEventMgmtAPI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Walton-Viking-Scouts/VikingsEventMgmtAPI/issues"
+  },
+  "homepage": "https://github.com/Walton-Viking-Scouts/VikingsEventMgmtAPI#readme",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
