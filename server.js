@@ -95,18 +95,18 @@ const getFrontendUrl = (req, options = {}) => {
   // Legacy state parameter support
   if (state === 'dev' || state === 'development' || process.env.DEV_MODE === 'true') {
     if (enableLogging) console.log('✅ Development environment detected');
-    return 'https://localhost:3000';
+    return 'https://localhost:3001';
   }
   
   // Enhanced production state detection
   if (state === 'prod' || state === 'production' || (state && state.startsWith('prod'))) {
     if (enableLogging) console.log('✅ Production environment detected (legacy)');
-    return 'https://vikings-eventmgmt.onrender.com';
+    return 'https://vikingeventmgmt.onrender.com';
   }
   
   // Default fallback
   if (enableLogging) console.log('⚠️ Using default production frontend URL');
-  return 'https://vikings-eventmgmt.onrender.com';
+  return 'https://vikingeventmgmt.onrender.com';
 };
 
 // Sentry request handler (must be first middleware) - v9 API handles this automatically
