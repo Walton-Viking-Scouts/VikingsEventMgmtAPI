@@ -372,13 +372,42 @@ app.get('/oauth/callback', async (req, res) => {
       code: code.substring(0, 20) + '...',
     });
 
-    const tokenResponse = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams(tokenPayload),
-    });
+    // Retry logic for token exchange with better timeout handling
+    let tokenResponse;
+    const maxRetries = 2;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Token exchange attempt ${attempt}/${maxRetries}...`);
+        
+        tokenResponse = await fetch('https://www.onlinescoutmanager.co.uk/oauth/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Vikings-OSM-Backend/1.0',
+            'Accept': 'application/json',
+          },
+          body: new URLSearchParams(tokenPayload),
+          signal: AbortSignal.timeout(30000), // 30 second timeout
+        });
+        
+        // If we get here, the request succeeded
+        break;
+        
+      } catch (error) {
+        console.log(`Token exchange attempt ${attempt} failed:`, error.message);
+        
+        if (attempt === maxRetries) {
+          // Final attempt failed, throw the error
+          throw error;
+        }
+        
+        // Wait before retry (exponential backoff)
+        const waitTime = 1000 * attempt; // 1s, 2s
+        console.log(`Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
 
     console.log('Token response status:', tokenResponse.status);
     
