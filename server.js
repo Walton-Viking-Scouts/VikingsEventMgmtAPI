@@ -224,7 +224,7 @@ app.post('/logout', authController.logout);
 // OSM API proxy endpoints (with rate limiting)
 app.get('/get-terms', osmController.getTerms); // Updated to GET
 app.get('/get-section-config', osmController.getSectionConfig); // Updated to GET
-app.get('/get-user-roles', osmController.getUserRoles); // Updated to GET
+app.post('/get-user-roles', osmController.getUserRoles); // OSM getUserRoles requires POST
 app.get('/get-events', osmController.getEvents); // Updated to GET
 app.get('/get-event-attendance', osmController.getEventAttendance);
 app.get('/get-contact-details', osmController.getContactDetails);

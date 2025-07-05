@@ -241,7 +241,9 @@ const osmEndpoints = {
         'Authorization': `Bearer ${access_token}`,
         'Content-Type': 'application/json',
       },
+      // No body for getUserRoles POST request
     }),
+    useStructuredLogging: true,
   }),
   
   getEvents: () => createSimpleGetHandler(

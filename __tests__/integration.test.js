@@ -38,6 +38,7 @@ describe('Integration Tests', () => {
       
       fetch.mockResolvedValueOnce({
         status: 200,
+        ok: true,
         headers: { 
           get: jest.fn((header) => {
             switch(header) {
@@ -49,10 +50,11 @@ describe('Integration Tests', () => {
           }),
         },
         json: () => Promise.resolve(mockResponse),
+        text: () => Promise.resolve(JSON.stringify(mockResponse)),
       });
 
       const response = await request(app)
-        .get('/get-user-roles')
+        .post('/get-user-roles')
         .set('Authorization', 'Bearer test_token')
         .expect(200);
 
