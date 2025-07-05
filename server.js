@@ -393,11 +393,9 @@ app.get('/oauth/callback', async (req, res) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Vikings-OSM-Backend/1.0',
-            'Accept': 'application/json',
           },
           body: new URLSearchParams(tokenPayload),
-          signal: AbortSignal.timeout(30000), // 30 second timeout
+          signal: AbortSignal.timeout(30000), // Keep timeout but remove custom headers
         });
         
         // If we get here, the request succeeded
