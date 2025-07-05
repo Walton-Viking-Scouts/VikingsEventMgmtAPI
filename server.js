@@ -92,16 +92,25 @@ const getFrontendUrl = (req, options = {}) => {
     return process.env.FRONTEND_URL;
   }
   
-  // Legacy state parameter support
-  if (state === 'dev' || state === 'development' || process.env.DEV_MODE === 'true') {
+  // Legacy state parameter support - check for base state only
+  const baseState = state ? state.split('&')[0] : state;
+  if (enableLogging) console.log('🔍 Base state extracted:', baseState);
+  
+  if (baseState === 'dev' || baseState === 'development' || process.env.DEV_MODE === 'true') {
     if (enableLogging) console.log('✅ Development environment detected');
-    return 'https://localhost:3000';
+    return 'https://localhost:3001';
   }
   
   // Enhanced production state detection
-  if (state === 'prod' || state === 'production' || (state && state.startsWith('prod'))) {
+  if (baseState === 'prod' || baseState === 'production' || (baseState && baseState.startsWith('prod'))) {
     if (enableLogging) console.log('✅ Production environment detected (legacy)');
-    return 'https://vikings-eventmgmt.onrender.com';
+    return 'https://vikingeventmgmt.onrender.com';
+  }
+  
+  // Special case for dev-to-prod (local frontend to deployed backend)
+  if (baseState === 'dev-to-prod') {
+    if (enableLogging) console.log('✅ Dev-to-prod environment detected');
+    return 'https://localhost:3001';
   }
   
   // Default fallback
