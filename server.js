@@ -45,7 +45,7 @@ const getFrontendUrl = (req, options = {}) => {
     return frontendUrlParam;
   }
   
-  // Parse state parameter for embedded frontend URL with better decoding
+  // Parse state parameter for embedded frontend URL with enhanced decoding
   if (state && state.includes('frontend_url=')) {
     if (enableLogging) console.log('🔍 State contains frontend_url, parsing...');
     
@@ -59,13 +59,23 @@ const getFrontendUrl = (req, options = {}) => {
       if (enableLogging) console.log('🔍 State not URL encoded, using as-is');
     }
     
-    // Extract frontend_url from the state parameter
+    // Extract frontend_url from the state parameter with improved regex
     const urlMatch = decodedState.match(/frontend_url=([^&]+)/);
     if (urlMatch) {
       try {
-        const extractedUrl = decodeURIComponent(urlMatch[1]);
+        let extractedUrl = urlMatch[1];
+        // Double decode if needed (sometimes URLs are double-encoded)
+        if (extractedUrl.includes('%')) {
+          extractedUrl = decodeURIComponent(extractedUrl);
+        }
         if (enableLogging) console.log('✅ Frontend URL extracted from state:', extractedUrl);
-        return extractedUrl;
+        
+        // Validate the extracted URL
+        if (extractedUrl.startsWith('http://') || extractedUrl.startsWith('https://')) {
+          return extractedUrl;
+        } else {
+          if (enableLogging) console.log('❌ Extracted URL is not a valid HTTP/HTTPS URL:', extractedUrl);
+        }
       } catch (_e) {
         if (enableLogging) console.log('❌ Error decoding extracted URL:', _e.message);
       }
@@ -93,16 +103,25 @@ const getFrontendUrl = (req, options = {}) => {
     return process.env.FRONTEND_URL;
   }
   
-  // Legacy state parameter support
-  if (state === 'dev' || state === 'development' || process.env.DEV_MODE === 'true') {
+  // Legacy state parameter support - check for base state only
+  const baseState = state ? state.split('&')[0] : state;
+  if (enableLogging) console.log('🔍 Base state extracted:', baseState);
+  
+  if (baseState === 'dev' || baseState === 'development' || process.env.DEV_MODE === 'true') {
     if (enableLogging) console.log('✅ Development environment detected');
     return 'https://localhost:3001';
   }
   
   // Enhanced production state detection
-  if (state === 'prod' || state === 'production' || (state && state.startsWith('prod'))) {
+  if (baseState === 'prod' || baseState === 'production' || (baseState && baseState.startsWith('prod'))) {
     if (enableLogging) console.log('✅ Production environment detected (legacy)');
     return 'https://vikingeventmgmt.onrender.com';
+  }
+  
+  // Special case for dev-to-prod (local frontend to deployed backend)
+  if (baseState === 'dev-to-prod') {
+    if (enableLogging) console.log('✅ Dev-to-prod environment detected');
+    return 'https://localhost:3001';
   }
   
   // Default fallback
@@ -337,11 +356,26 @@ app.get('/oauth/callback', async (req, res) => {
       error,
       hasCode: !!code,
       referer: req.get('Referer'),
+      origin: req.get('Origin'),
       userAgent: req.get('User-Agent'),
+      allQueryParams: req.query,
     });
     
-    // Debug the frontend URL determination
+    // Debug the frontend URL determination with enhanced logging
     console.log('🎯 Determining frontend URL for redirect...');
+    console.log('🔍 Raw request details:', {
+      state: state,
+      stateType: typeof state,
+      stateIncludes: state ? {
+        includesFrontendUrl: state.includes('frontend_url='),
+        includesAmpersand: state.includes('&'),
+        splitByAmpersand: state.split('&'),
+      } : null,
+      frontendUrlParam: req.query.frontend_url,
+      referer: req.get('Referer'),
+      origin: req.get('Origin'),
+    });
+    
     const frontendUrl = getFrontendUrl(req, {enableLogging: true});
     console.log('🚀 Final frontend URL selected:', frontendUrl);
     
