@@ -243,11 +243,57 @@ const osmEndpoints = {
     [],
   ),
   
-  getEvents: () => createSimpleGetHandler(
-    'getEvents',
-    'https://www.onlinescoutmanager.co.uk/ext/events/summary/?action=get',
-    ['sectionid', 'termid'],
-  ),
+  getEvents: () => createOSMApiHandler('getEvents', {
+    method: 'GET',
+    requiredParams: ['sectionid', 'termid'],
+    buildUrl: (req) => {
+      const url = new URL('https://www.onlinescoutmanager.co.uk/ext/events/summary/?action=get');
+      
+      // Add query parameters
+      Object.entries(req.query).forEach(([key, value]) => {
+        if (value !== undefined) {
+          url.searchParams.append(key, value);
+        }
+      });
+      
+      return url.toString();
+    },
+    buildRequestOptions: (_req, access_token) => ({
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json',
+      },
+    }),
+    processResponse: (data, _req) => {
+      // Convert UK date format (dd/mm/yyyy) to ISO format for frontend
+      if (data.items && Array.isArray(data.items)) {
+        data.items = data.items.map(event => {
+          const convertedEvent = { ...event };
+          
+          // Convert date fields from dd/mm/yyyy to ISO format
+          const dateFields = ['date', 'startdate', 'enddate'];
+          dateFields.forEach(field => {
+            if (convertedEvent[field] && convertedEvent[field].includes('/')) {
+              // Convert dd/mm/yyyy to yyyy-mm-dd
+              const [day, month, year] = convertedEvent[field].split('/');
+              if (day && month && year) {
+                convertedEvent[field + '_iso'] = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                // Keep original for backward compatibility
+                convertedEvent[field + '_original'] = convertedEvent[field];
+                // Update main field to be JavaScript-friendly (mm/dd/yyyy)
+                convertedEvent[field] = `${month}/${day}/${year}`;
+              }
+            }
+          });
+          
+          return convertedEvent;
+        });
+      }
+      
+      return data;
+    },
+  }),
   
   getEventAttendance: () => createSimpleGetHandler(
     'getEventAttendance',
