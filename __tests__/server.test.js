@@ -102,23 +102,45 @@ describe('Vikings OSM Backend API', () => {
     });
 
     test('GET /get-section-config should require access token and sectionid', async () => {
-      const response = await request(app)
+      // First test without authorization token - should get 401
+      const response1 = await request(app)
         .get('/get-section-config')
+        .send({})
+        .expect(401);
+
+      expect(response1.body).toHaveProperty('error');
+      expect(response1.body.error).toContain('Access token is required');
+
+      // Test with authorization token but missing sectionid - should get 400
+      const response2 = await request(app)
+        .get('/get-section-config')
+        .set('Authorization', 'Bearer test_token')
         .send({})
         .expect(400);
 
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toContain('access_token');
+      expect(response2.body).toHaveProperty('error');
+      expect(response2.body.error).toContain('sectionid');
     });
 
     test('GET /get-flexi-structure should require access token, sectionid, and flexirecordid', async () => {
-      const response = await request(app)
+      // First test without authorization token - should get 401
+      const response1 = await request(app)
         .get('/get-flexi-structure')
+        .query({})
+        .expect(401);
+
+      expect(response1.body).toHaveProperty('error');
+      expect(response1.body.error).toContain('Access token is required');
+
+      // Test with authorization token but missing required params - should get 400
+      const response2 = await request(app)
+        .get('/get-flexi-structure')
+        .set('Authorization', 'Bearer test_token')
         .query({})
         .expect(400);
 
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toContain('flexirecordid');
+      expect(response2.body).toHaveProperty('error');
+      expect(response2.body.error).toContain('flexirecordid');
     });
 
     test('OAuth debug endpoint should provide configuration info', async () => {
