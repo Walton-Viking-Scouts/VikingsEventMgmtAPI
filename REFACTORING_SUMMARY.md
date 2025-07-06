@@ -139,7 +139,7 @@ const getMembersGrid = createOSMApiHandler('getMembersGrid', {
 - `utils/responseHelpers.js` - Response utilities
 - `utils/osmEndpointFactories.js` - Endpoint factories
 - `controllers/osm-legacy.js` - Legacy functions
-- `controllers/osm-original.js` - Backup of original
+- `controllers/osm-original.js` - Backup of original *(removed after successful refactoring)*
 
 ### **Modified:**
 - `controllers/osm.js` - Main refactored controller
