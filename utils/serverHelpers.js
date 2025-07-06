@@ -153,9 +153,6 @@ const logAvailableEndpoints = () => {
 const createCorsOriginValidator = (allowedOrigins, prPreviewPattern) => {
   return (origin, callback) => {
     console.log('🔍 CORS check for origin:', origin);
-    console.log('🔍 Origin type:', typeof origin);
-    console.log('🔍 Origin length:', origin ? origin.length : 'null');
-    console.log('🔍 Allowed origins:', allowedOrigins);
     
     // Allow requests with no origin (mobile apps, postman, etc.)
     if (!origin) {
@@ -177,11 +174,6 @@ const createCorsOriginValidator = (allowedOrigins, prPreviewPattern) => {
     
     // Reject all other origins
     console.log('❌ CORS: Origin rejected:', origin);
-    console.log('❌ CORS: Full origin string:', JSON.stringify(origin));
-    console.log('❌ CORS: Checking exact matches:');
-    allowedOrigins.forEach(allowed => {
-      console.log(`   - "${allowed}" === "${origin}": ${allowed === origin}`);
-    });
     callback(new Error('Not allowed by CORS'));
   };
 };

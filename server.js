@@ -139,15 +139,12 @@ if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
 const allowedOrigins = [
   'https://vikings-eventmgmt.onrender.com',  // Production frontend (vanilla)
   'https://vikingeventmgmt.onrender.com',    // Production frontend (React mobile)
-  'https://vikings-osm-frontend.onrender.com',  // Potential alternative frontend URL
-  'https://vikings-event-mgmt.onrender.com',    // Alternative URL format
-  'https://vikingeventmgmt-prod.onrender.com',  // Potential production variant
   'https://localhost:3000',                  // Development frontend (vanilla)
   'http://localhost:3000',                   // Development frontend (vanilla - http)
   'https://localhost:3001',                  // Development frontend (React mobile)
   'http://localhost:3001',                   // Development frontend (React mobile - http)
 ];
-const prPreviewPattern = /^https:\/\/vikings-event-management-front-end-pr-\d+\.onrender\.com$/;
+const prPreviewPattern = /^https:\/\/vikingeventmgmt-pr-\d+\.onrender\.com$/;
 
 app.use(cors({
   origin: createCorsOriginValidator(allowedOrigins, prPreviewPattern),
