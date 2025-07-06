@@ -1,4 +1,11 @@
 const { createOSMApiHandler } = require('./osmApiHandler');
+const { 
+  getSessionId, 
+  makeOSMRequest, 
+  getOSMRateLimitInfo, 
+  addRateLimitInfoToResponse,
+} = require('../middleware/rateLimiting');
+const { logger: _logger } = require('../config/sentry');
 
 /**
  * Creates a simple OSM GET endpoint handler
@@ -127,14 +134,14 @@ const createStartupHandler = (endpoint, baseUrl) => {
   // Special handler for startup endpoint that needs custom response processing
   return async (req, res) => {
     const access_token = req.headers.authorization?.replace('Bearer ', '');
-    const sessionId = require('../middleware/rateLimiting').getSessionId(req);
+    const sessionId = getSessionId(req);
     
     if (!access_token) {
       return res.status(401).json({ error: 'Access token is required in Authorization header' });
     }
 
     try {
-      const response = await require('../middleware/rateLimiting').makeOSMRequest(baseUrl, {
+      const response = await makeOSMRequest(baseUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${access_token}`,
@@ -142,7 +149,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
       }, sessionId);
 
       if (response.status === 429) {
-        const osmInfo = require('../middleware/rateLimiting').getOSMRateLimitInfo(sessionId);
+        const osmInfo = getOSMRateLimitInfo(sessionId);
         return res.status(429).json({ 
           error: 'OSM API rate limit exceeded',
           rateLimitInfo: osmInfo,
@@ -161,7 +168,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
       
       try {
         const data = JSON.parse(jsonText);
-        const responseWithRateInfo = require('../middleware/rateLimiting').addRateLimitInfoToResponse(req, res, data);
+        const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
       } catch (parseError) {
         return res.status(500).json({ 
