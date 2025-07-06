@@ -54,7 +54,7 @@ describe('Integration Tests', () => {
       });
 
       const response = await request(app)
-        .post('/get-user-roles')
+        .get('/get-user-roles')
         .set('Authorization', 'Bearer test_token')
         .expect(200);
 
