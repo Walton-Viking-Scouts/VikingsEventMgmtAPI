@@ -68,8 +68,12 @@ describe('Integration Tests', () => {
         .get('/oauth/debug')
         .expect(200);
 
-      expect(response.body).toHaveProperty('clientId');
-      expect(response.body).toHaveProperty('frontendUrl');
+      expect(response.body).toHaveProperty('configuration');
+      expect(response.body.configuration).toHaveProperty('clientId');
+      expect(response.body.configuration).toHaveProperty('frontendUrl');
+      expect(response.body).toHaveProperty('runtime');
+      expect(response.body).toHaveProperty('tokenStorage');
+      expect(response.body).toHaveProperty('environment');
     });
   });
 });
