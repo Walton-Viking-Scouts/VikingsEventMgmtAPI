@@ -1,5 +1,4 @@
 const { createOSMApiHandler } = require('./osmApiHandler');
-const { parseOSMResponse, parseOSMStartupResponse } = require('./responseHelpers');
 
 /**
  * Creates a simple OSM GET endpoint handler
@@ -110,7 +109,7 @@ const createContactHandler = (endpoint, baseUrl, requiredParams = []) => {
         'Authorization': `Bearer ${access_token}`,
       },
     }),
-    processResponse: (data, req) => {
+    processResponse: (data, _req) => {
       // For contact endpoints, we just return the data as-is
       // The JSON parsing is already handled by the main handler
       return data;

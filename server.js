@@ -218,7 +218,7 @@ app.post('/get-members-grid', osmController.getMembersGrid);
 
 // Sentry test endpoint
 app.get('/test-sentry', createTestEndpoint({
-  'error': (req, res) => {
+  'error': (_req, _res) => {
     throw new Error('Test error for Sentry - this is expected!');
   },
   'message': (req, res) => {
@@ -342,7 +342,7 @@ app.get('/oauth/callback', async (req, res) => {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams(tokenPayload),
-          signal: AbortSignal.timeout(30000), // Keep timeout but remove custom headers
+          signal: global.AbortSignal?.timeout ? global.AbortSignal.timeout(30000) : undefined, // Keep timeout but remove custom headers
         });
         
         // If we get here, the request succeeded

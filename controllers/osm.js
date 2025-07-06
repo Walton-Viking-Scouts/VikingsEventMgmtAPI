@@ -10,7 +10,6 @@ const {
 const { osmEndpoints } = require('../utils/osmEndpointFactories');
 const { createOSMApiHandler } = require('../utils/osmApiHandler');
 const { validateFieldIdFormat, validateArrayParam } = require('../utils/validators');
-const { sendErrorResponse } = require('../utils/responseHelpers');
 
 // Import existing complex functions that need custom handling
 const { transformMemberGridData } = require('./osm-legacy');
@@ -89,7 +88,7 @@ const getMembersGrid = createOSMApiHandler('getMembersGrid', {
       body: requestBody,
     };
   },
-  processResponse: (data) => {
+  processResponse: (data, _req) => {
     // Apply the existing transformation logic
     return transformMemberGridData(data);
   },
@@ -132,7 +131,7 @@ const multiUpdateFlexiRecord = createOSMApiHandler('multiUpdateFlexiRecord', {
   requiredParams: ['sectionid', 'scouts', 'value', 'column', 'flexirecordid'],
   buildUrl: (req) => `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=multiUpdate&sectionid=${req.body.sectionid}`,
   buildRequestOptions: (req, access_token) => {
-    const { sectionid, scouts, value, column, flexirecordid } = req.body;
+    const { scouts, value, column, flexirecordid } = req.body;
     
     // Custom validation for scouts array
     const scoutsValidation = validateArrayParam(scouts, 'scouts');
