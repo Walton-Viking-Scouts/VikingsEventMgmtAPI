@@ -16,6 +16,133 @@ const fallbackLogger = {
 const log = logger || fallbackLogger;
 
 /**
+ * Creates an endpoint-specific logger with consistent formatting
+ * @param {string} endpoint - The endpoint name for logging
+ * @param {string} requestId - Unique request identifier
+ * @param {string} sessionId - Session identifier
+ * @param {string} method - HTTP method
+ * @param {boolean} useStructuredLogging - Whether to use structured logging
+ * @returns {Object} Logger object with info, warn, error methods
+ */
+const createEndpointLogger = (endpoint, requestId, sessionId, method, useStructuredLogging = true) => {
+  const createLogMethod = (level) => (message, data = {}) => {
+    if (useStructuredLogging) {
+      log[level](log.fmt`OSM API ${endpoint}: ${message}`, {
+        endpoint,
+        requestId,
+        sessionId,
+        method,
+        section: 'osm-api',
+        timestamp: new Date().toISOString(),
+        ...data,
+      });
+    } else {
+      console[level](`[${endpoint}] ${message}`, data);
+    }
+  };
+
+  return {
+    info: createLogMethod('info'),
+    warn: createLogMethod('warn'),
+    error: createLogMethod('error'),
+  };
+};
+
+/**
+ * Validates request parameters and access token
+ * @param {Object} req - Express request object
+ * @param {string} access_token - Access token from header
+ * @param {Array<string>} requiredParams - Required parameters
+ * @param {Object} endpointLogger - Logger instance
+ * @returns {Object|null} Validation result with error response or null if valid
+ */
+const validateRequestParams = (req, access_token, requiredParams, endpointLogger) => {
+  // Validate access token
+  if (!access_token) {
+    endpointLogger.warn('Missing authorization token');
+    return {
+      status: 401,
+      json: { error: 'Access token is required in Authorization header' },
+    };
+  }
+
+  // Validate required parameters
+  const missingParams = requiredParams.filter(param => {
+    const value = req.query[param] || req.body[param];
+    return !value;
+  });
+
+  if (missingParams.length > 0) {
+    endpointLogger.warn('Missing required parameters', { 
+      missingParams,
+      providedQuery: Object.keys(req.query),
+      providedBody: Object.keys(req.body),
+    });
+    return {
+      status: 400,
+      json: { error: `Missing required parameters: ${missingParams.join(', ')}` },
+    };
+  }
+
+  return null; // Validation passed
+};
+
+/**
+ * Processes OSM API response with error handling and JSON parsing
+ * @param {Response} response - Fetch response object
+ * @param {string} responseText - Response text content
+ * @param {Function} processResponse - Optional custom response processor
+ * @param {Object} req - Express request object
+ * @param {Object} endpointLogger - Logger instance
+ * @returns {Object} Processed response data or error response
+ */
+const processOSMResponse = async (response, responseText, processResponse, req, endpointLogger) => {
+  // Handle empty response
+  if (!responseText.trim()) {
+    endpointLogger.error('Empty response from OSM API');
+    return {
+      status: 500,
+      json: { error: 'Empty response from OSM API' },
+    };
+  }
+
+  // Parse JSON response
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (parseError) {
+    endpointLogger.error('JSON parse error', {
+      parseError: parseError.message,
+      responseLength: responseText.length,
+      responsePreview: responseText.substring(0, 200),
+    });
+    return {
+      status: 500,
+      json: { 
+        error: 'Invalid JSON response from OSM API',
+        details: responseText.substring(0, 500),
+      },
+    };
+  }
+
+  // Apply custom response processing if provided
+  if (processResponse) {
+    data = processResponse(data, req);
+  }
+
+  // Success logging
+  endpointLogger.info('Request completed successfully', {
+    status: response.status,
+    responseSize: responseText.length,
+    hasData: !!data,
+    dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+    rateLimitInfo: getOSMRateLimitInfo(req.sessionId),
+  });
+
+  return { data }; // Success - return data
+};
+
+/**
  * Creates a standardized OSM API request handler
  * @param {string} endpoint - The endpoint name for logging
  * @param {Object} config - Configuration object
@@ -43,53 +170,7 @@ const createOSMApiHandler = (endpoint, config) => {
     const requestId = `${sessionId}-${Date.now()}`;
     
     // Create endpoint logger
-    const endpointLogger = {
-      info: (message, data = {}) => {
-        if (useStructuredLogging) {
-          log.info(log.fmt`OSM API ${endpoint}: ${message}`, {
-            endpoint,
-            requestId,
-            sessionId,
-            method,
-            section: 'osm-api',
-            timestamp: new Date().toISOString(),
-            ...data,
-          });
-        } else {
-          console.log(`[${endpoint}] ${message}`, data);
-        }
-      },
-      warn: (message, data = {}) => {
-        if (useStructuredLogging) {
-          log.warn(log.fmt`OSM API ${endpoint}: ${message}`, {
-            endpoint,
-            requestId,
-            sessionId,
-            method,
-            section: 'osm-api',
-            timestamp: new Date().toISOString(),
-            ...data,
-          });
-        } else {
-          console.warn(`[${endpoint}] ${message}`, data);
-        }
-      },
-      error: (message, data = {}) => {
-        if (useStructuredLogging) {
-          log.error(log.fmt`OSM API ${endpoint}: ${message}`, {
-            endpoint,
-            requestId,
-            sessionId,
-            method,
-            section: 'osm-api',
-            timestamp: new Date().toISOString(),
-            ...data,
-          });
-        } else {
-          console.error(`[${endpoint}] ${message}`, data);
-        }
-      },
-    };
+    const endpointLogger = createEndpointLogger(endpoint, requestId, sessionId, method, useStructuredLogging);
 
     // Pre-call logging
     endpointLogger.info('Processing request', {
@@ -98,29 +179,10 @@ const createOSMApiHandler = (endpoint, config) => {
       userAgent: req.headers['user-agent'],
     });
 
-    // Validate access token
-    if (!access_token) {
-      endpointLogger.warn('Missing authorization token');
-      return res.status(401).json({ 
-        error: 'Access token is required in Authorization header',
-      });
-    }
-
-    // Validate required parameters
-    const missingParams = requiredParams.filter(param => {
-      const value = req.query[param] || req.body[param];
-      return !value;
-    });
-
-    if (missingParams.length > 0) {
-      endpointLogger.warn('Missing required parameters', { 
-        missingParams,
-        providedQuery: Object.keys(req.query),
-        providedBody: Object.keys(req.body),
-      });
-      return res.status(400).json({ 
-        error: `Missing required parameters: ${missingParams.join(', ')}`,
-      });
+    // Validate request parameters and access token
+    const validationError = validateRequestParams(req, access_token, requiredParams, endpointLogger);
+    if (validationError) {
+      return res.status(validationError.status).json(validationError.json);
     }
 
     try {
@@ -170,46 +232,20 @@ const createOSMApiHandler = (endpoint, config) => {
       }
 
       // Process response
-      let data;
       const responseText = await response.text();
       
-      if (!responseText.trim()) {
-        endpointLogger.error('Empty response from OSM API');
-        return res.status(500).json({ 
-          error: 'Empty response from OSM API',
-        });
+      // Store sessionId on req for the helper function
+      req.sessionId = sessionId;
+      
+      const processResult = await processOSMResponse(response, responseText, processResponse, req, endpointLogger);
+      
+      // Check if processing returned an error
+      if (processResult.status) {
+        return res.status(processResult.status).json(processResult.json);
       }
 
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        endpointLogger.error('JSON parse error', {
-          parseError: parseError.message,
-          responseLength: responseText.length,
-          responsePreview: responseText.substring(0, 200),
-        });
-        return res.status(500).json({ 
-          error: 'Invalid JSON response from OSM API',
-          details: responseText.substring(0, 500),
-        });
-      }
-
-      // Apply custom response processing if provided
-      if (processResponse) {
-        data = processResponse(data, req);
-      }
-
-      // Success logging
-      endpointLogger.info('Request completed successfully', {
-        status: response.status,
-        responseSize: responseText.length,
-        hasData: !!data,
-        dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
-        rateLimitInfo: getOSMRateLimitInfo(sessionId),
-      });
-
-      // Send response with rate limit info
-      const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
+      // Send successful response with rate limit info
+      const responseWithRateInfo = addRateLimitInfoToResponse(req, res, processResult.data);
       res.json(responseWithRateInfo);
 
     } catch (err) {
@@ -261,4 +297,7 @@ const createSimpleOSMHandler = (endpoint, baseUrl, requiredParams = []) => {
 module.exports = {
   createOSMApiHandler,
   createSimpleOSMHandler,
+  createEndpointLogger,
+  validateRequestParams,
+  processOSMResponse,
 };
