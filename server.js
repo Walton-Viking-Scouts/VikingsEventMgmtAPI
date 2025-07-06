@@ -200,6 +200,67 @@ app.get('/rate-limit-status', osmController.getRateLimitStatus);
 app.get('/token', authController.getCurrentToken);
 app.post('/logout', authController.logout);
 
+// Token exchange endpoint for cross-domain OAuth
+app.post('/oauth/exchange', (req, res) => {
+  const { exchange_code } = req.body;
+  
+  if (!exchange_code) {
+    return res.status(400).json({ error: 'Exchange code is required' });
+  }
+  
+  // Get the exchange code data
+  const exchangeData = global.oauthExchangeCodes?.get(exchange_code);
+  
+  if (!exchangeData) {
+    return res.status(400).json({ error: 'Invalid or expired exchange code' });
+  }
+  
+  // Check if code has expired
+  if (Date.now() > exchangeData.expires) {
+    global.oauthExchangeCodes.delete(exchange_code);
+    return res.status(400).json({ error: 'Exchange code has expired' });
+  }
+  
+  // Check if code has already been used
+  if (exchangeData.used) {
+    return res.status(400).json({ error: 'Exchange code has already been used' });
+  }
+  
+  // Mark as used and remove from storage
+  exchangeData.used = true;
+  global.oauthExchangeCodes.delete(exchange_code);
+  
+  // Generate session ID and store the token
+  const { getSessionId } = require('./middleware/rateLimiting');
+  const { storeToken } = require('./controllers/auth');
+  
+  // Create a session ID for this token
+  const crypto = require('crypto');
+  const sessionId = crypto.randomUUID();
+  
+  // Store the token properly
+  const storedTokenData = storeToken(sessionId, exchangeData.tokenData);
+  
+  // Set session cookie for future requests
+  res.cookie('session_id', sessionId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none', // Required for cross-domain cookies
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  });
+  
+  console.log(`🔐 Token exchanged successfully for session: ${sessionId}`);
+  
+  // Return the token data (frontend will store this)
+  res.json({
+    access_token: exchangeData.tokenData.access_token,
+    token_type: exchangeData.tokenData.token_type || 'Bearer',
+    expires_in: exchangeData.tokenData.expires_in || 3600,
+    scope: exchangeData.tokenData.scope,
+    session_id: sessionId,
+  });
+});
+
 // Token management endpoint for debugging (remove in production)
 app.get('/admin/tokens', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
@@ -485,32 +546,38 @@ app.get('/oauth/callback', async (req, res) => {
       return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
     }
 
-    // Generate or get session ID
-    const { getSessionId } = require('./middleware/rateLimiting');
+    // For cross-domain setups, create a short-lived exchange code
+    const crypto = require('crypto');
+    const exchangeCode = crypto.randomBytes(32).toString('hex');
+    
+    // Store the token temporarily with the exchange code (5 minutes expiry)
     const { storeToken } = require('./controllers/auth');
-    let sessionId = getSessionId(req);
+    const tempTokens = new Map();
     
-    // If no session cookie exists, create one
-    if (!req.cookies?.session_id) {
-      const crypto = require('crypto');
-      sessionId = crypto.randomUUID();
-      
-      // Set secure session cookie
-      res.cookie('session_id', sessionId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      });
-      
-      console.log(`🔐 New session created: ${sessionId}`);
+    // Store token with exchange code for 5 minutes
+    tempTokens.set(exchangeCode, {
+      tokenData: tokenData,
+      expires: Date.now() + (5 * 60 * 1000), // 5 minutes
+      used: false,
+    });
+    
+    // Clean up expired exchange codes
+    setTimeout(() => {
+      tempTokens.delete(exchangeCode);
+    }, 5 * 60 * 1000);
+    
+    // Store the exchange code mapping globally for the token exchange endpoint
+    if (!global.oauthExchangeCodes) {
+      global.oauthExchangeCodes = new Map();
     }
+    global.oauthExchangeCodes.set(exchangeCode, {
+      tokenData: tokenData,
+      expires: Date.now() + (5 * 60 * 1000),
+      used: false,
+    });
     
-    // Store token using the auth controller
-    const storedTokenData = storeToken(sessionId, tokenData);
-    
-    // Redirect to frontend without token in URL (more secure)
-    const redirectUrl = `${frontendUrl}/?auth=success&session=${sessionId}`;
+    // Redirect to frontend with exchange code (not the actual token)
+    const redirectUrl = `${frontendUrl}/?auth=success&exchange_code=${exchangeCode}`;
     oAuthCallbackLogger.logSuccessfulRedirect(redirectUrl);
     res.redirect(redirectUrl);
     
