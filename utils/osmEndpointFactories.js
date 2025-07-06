@@ -237,20 +237,11 @@ const osmEndpoints = {
     ['sectionid'],
   ),
   
-  getUserRoles: () => createOSMApiHandler('getUserRoles', {
-    method: 'POST',
-    requiredParams: [],
-    buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles',
-    buildRequestOptions: (_req, access_token) => ({
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json',
-      },
-      // No body for getUserRoles POST request
-    }),
-    useStructuredLogging: true,
-  }),
+  getUserRoles: () => createSimpleGetHandler(
+    'getUserRoles',
+    'https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles',
+    [],
+  ),
   
   getEvents: () => createSimpleGetHandler(
     'getEvents',
@@ -274,14 +265,14 @@ const osmEndpoints = {
   getListOfMembers: () => createContactHandler(
     'getListOfMembers',
     'https://www.onlinescoutmanager.co.uk/ext/members/contact/?action=getListOfMembers',
-    ['sectionid'],
+    ['sectionid', 'termid', 'section'],
   ),
   
   // Flexi record endpoints
-  getFlexiRecords: () => createContactHandler(
+  getFlexiRecords: () => createSimpleGetHandler(
     'getFlexiRecords',
     'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getFlexiRecords',
-    ['sectionid'],
+    ['sectionid'], // archived parameter is optional
   ),
   
   getFlexiStructure: () => createOSMApiHandler('getFlexiStructure', {
