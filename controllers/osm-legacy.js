@@ -32,14 +32,14 @@ const transformMemberGridData = (rawData) => {
     rawData.meta.structure.forEach(group => {
       if (group.columns && Array.isArray(group.columns)) {
         const groupInfo = {
-          group_id: group.group_id,
+          group_id: String(group.group_id), // Normalize to string for consistent typing
           name: group.name,
           identifier: group.identifier,
           columns: [],
         };
         
         group.columns.forEach(column => {
-          const groupColumnId = `${group.group_id}_${column.column_id}`;
+          const groupColumnId = `${String(group.group_id)}_${column.column_id}`;
           columnMapping[groupColumnId] = {
             label: column.label,
             type: column.type,
@@ -83,15 +83,16 @@ const transformMemberGridData = (rawData) => {
     // Transform custom_data using column mapping
     if (memberData.custom_data) {
       Object.entries(memberData.custom_data).forEach(([groupId, groupData]) => {
-        const groupInfo = contactGroups.find(g => g.group_id.toString() === groupId);
-        const groupName = groupInfo ? groupInfo.name : `Group ${groupId}`;
+        const normalizedGroupId = String(groupId); // Normalize groupId to string for consistent comparison
+        const groupInfo = contactGroups.find(g => g.group_id === normalizedGroupId);
+        const groupName = groupInfo ? groupInfo.name : `Group ${normalizedGroupId}`;
         
         if (!transformedMember.contact_groups[groupName]) {
           transformedMember.contact_groups[groupName] = {};
         }
         
         Object.entries(groupData).forEach(([columnId, value]) => {
-          const groupColumnId = `${groupId}_${columnId}`;
+          const groupColumnId = `${normalizedGroupId}_${columnId}`;
           const columnInfo = columnMapping[groupColumnId];
           
           if (columnInfo) {

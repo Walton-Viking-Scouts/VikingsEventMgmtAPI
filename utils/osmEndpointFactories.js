@@ -23,7 +23,7 @@ const createSimpleGetHandler = (endpoint, baseUrl, requiredParams = []) => {
       
       return url.toString();
     },
-    buildRequestOptions: (req, access_token) => ({
+    buildRequestOptions: (_req, access_token) => ({
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${access_token}`,
@@ -44,7 +44,7 @@ const createSimplePostHandler = (endpoint, baseUrl, requiredParams = []) => {
   return createOSMApiHandler(endpoint, {
     method: 'POST',
     requiredParams,
-    buildUrl: (req) => baseUrl,
+    buildUrl: (_req) => baseUrl,
     buildRequestOptions: (req, access_token) => ({
       method: 'POST',
       headers: {
@@ -68,7 +68,7 @@ const createFormPostHandler = (endpoint, baseUrl, requiredParams, buildFormData)
   return createOSMApiHandler(endpoint, {
     method: 'POST',
     requiredParams,
-    buildUrl: (req) => baseUrl,
+    buildUrl: (_req) => baseUrl,
     buildRequestOptions: (req, access_token) => ({
       method: 'POST',
       headers: {
@@ -103,7 +103,7 @@ const createContactHandler = (endpoint, baseUrl, requiredParams = []) => {
       
       return url.toString();
     },
-    buildRequestOptions: (req, access_token) => ({
+    buildRequestOptions: (_req, access_token) => ({
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${access_token}`,
@@ -187,7 +187,7 @@ const createFlexiUpdateHandler = (endpoint, baseUrl, requiredParams, customValid
   return createOSMApiHandler(endpoint, {
     method: 'POST',
     requiredParams,
-    buildUrl: (req) => baseUrl,
+    buildUrl: (_req) => baseUrl,
     buildRequestOptions: (req, access_token) => {
       // Build form data for OSM API
       const formData = new URLSearchParams();
@@ -221,20 +221,20 @@ const osmEndpoints = {
   getTerms: () => createSimpleGetHandler(
     'getTerms',
     'https://www.onlinescoutmanager.co.uk/api.php?action=getTerms',
-    []
+    [],
   ),
   
   getSectionConfig: () => createSimpleGetHandler(
     'getSectionConfig',
     'https://www.onlinescoutmanager.co.uk/api.php?action=getSectionConfig',
-    ['sectionid']
+    ['sectionid'],
   ),
   
   getUserRoles: () => createOSMApiHandler('getUserRoles', {
     method: 'POST',
     requiredParams: [],
-    buildUrl: (req) => 'https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles',
-    buildRequestOptions: (req, access_token) => ({
+    buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles',
+    buildRequestOptions: (_req, access_token) => ({
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${access_token}`,
@@ -248,33 +248,33 @@ const osmEndpoints = {
   getEvents: () => createSimpleGetHandler(
     'getEvents',
     'https://www.onlinescoutmanager.co.uk/ext/events/summary/?action=get',
-    ['sectionid', 'termid']
+    ['sectionid', 'termid'],
   ),
   
   getEventAttendance: () => createSimpleGetHandler(
     'getEventAttendance',
     'https://www.onlinescoutmanager.co.uk/ext/events/event/?action=getAttendance',
-    ['sectionid', 'termid', 'eventid']
+    ['sectionid', 'termid', 'eventid'],
   ),
   
   // Contact-related endpoints (with special handling)
   getContactDetails: () => createContactHandler(
     'getContactDetails',
     'https://www.onlinescoutmanager.co.uk/ext/members/contact/?action=getIndividual',
-    ['sectionid', 'scoutid']
+    ['sectionid', 'scoutid'],
   ),
   
   getListOfMembers: () => createContactHandler(
     'getListOfMembers',
     'https://www.onlinescoutmanager.co.uk/ext/members/contact/?action=getListOfMembers',
-    ['sectionid']
+    ['sectionid'],
   ),
   
   // Flexi record endpoints
   getFlexiRecords: () => createContactHandler(
     'getFlexiRecords',
     'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getFlexiRecords',
-    ['sectionid']
+    ['sectionid'],
   ),
   
   getFlexiStructure: () => createOSMApiHandler('getFlexiStructure', {
@@ -284,13 +284,13 @@ const osmEndpoints = {
       const { sectionid, flexirecordid, termid } = req.query;
       return `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getStructure&sectionid=${sectionid}&extraid=${flexirecordid}&termid=${termid}`;
     },
-    buildRequestOptions: (req, access_token) => ({
+    buildRequestOptions: (_req, access_token) => ({
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
     }),
-    processResponse: (data, req) => {
+    processResponse: (data, _req) => {
       return data;
     },
   }),
@@ -302,13 +302,13 @@ const osmEndpoints = {
       const { sectionid, flexirecordid, termid } = req.query;
       return `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=getData&extraid=${flexirecordid}&sectionid=${sectionid}&termid=${termid}&nototal`;
     },
-    buildRequestOptions: (req, access_token) => ({
+    buildRequestOptions: (_req, access_token) => ({
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
     }),
-    processResponse: (data, req) => {
+    processResponse: (data, _req) => {
       return data;
     },
   }),
@@ -316,7 +316,7 @@ const osmEndpoints = {
   // Startup endpoint (with special response processing)
   getStartupData: () => createStartupHandler(
     'getStartupData',
-    'https://www.onlinescoutmanager.co.uk/ext/generic/startup/?action=getData'
+    'https://www.onlinescoutmanager.co.uk/ext/generic/startup/?action=getData',
   ),
 };
 

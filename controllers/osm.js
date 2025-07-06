@@ -72,7 +72,7 @@ const getStartupData = osmEndpoints.getStartupData();
 const getMembersGrid = createOSMApiHandler('getMembersGrid', {
   method: 'POST',
   requiredParams: ['section_id', 'term_id'],
-  buildUrl: (req) => 'https://www.onlinescoutmanager.co.uk/ext/members/contact/grid/?action=getMembers',
+  buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/ext/members/contact/grid/?action=getMembers',
   buildRequestOptions: (req, access_token) => {
     const requestBody = new URLSearchParams({
       section_id: req.body.section_id,
@@ -97,7 +97,7 @@ const getMembersGrid = createOSMApiHandler('getMembersGrid', {
 const updateFlexiRecord = createOSMApiHandler('updateFlexiRecord', {
   method: 'POST',
   requiredParams: ['sectionid', 'scoutid', 'flexirecordid', 'columnid', 'value'],
-  buildUrl: (req) => 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateRecord',
+  buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateRecord',
   buildRequestOptions: (req, access_token) => {
     const { sectionid, scoutid, flexirecordid, columnid, value } = req.body;
     

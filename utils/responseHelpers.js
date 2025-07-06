@@ -88,7 +88,7 @@ const sendServerError = (res, error, includeDetails = process.env.NODE_ENV === '
  * @param {string} endpoint - Endpoint name for logging
  * @returns {Object} Parsed data or error information
  */
-const parseOSMResponse = (responseText, endpoint) => {
+const parseOSMResponse = (responseText, _endpoint) => {
   if (!responseText.trim()) {
     return {
       success: false,
