@@ -172,6 +172,7 @@ app.get('/rate-limit-status', osmController.getRateLimitStatus);
 
 // OAuth/Authentication endpoints
 app.get('/token', authController.getCurrentToken);
+app.get('/validate-token', authController.validateTokenFromHeader);
 app.post('/logout', authController.logout);
 
 
@@ -413,19 +414,109 @@ app.get('/test-frontend-url', (req, res) => {
       backendUrl: process.env.BACKEND_URL || 'Not set',
     },
     testScenarios: {
-      localhost: '/test-frontend-url?state=dev',
-      production: '/test-frontend-url?state=prod',
-      explicit: '/test-frontend-url?frontend_url=https://example.com',
-      prPreview: 'Test from PR preview environment (automatic via Referer)',
+      localhost: {
+        test: '/test-frontend-url?state=dev',
+        expected: 'https://localhost:3001',
+        description: 'Development environment detection'
+      },
+      production: {
+        test: '/test-frontend-url',
+        expected: 'https://vikingeventmgmt.onrender.com',
+        description: 'Production environment (default)'
+      },
+      explicit: {
+        test: '/test-frontend-url?frontend_url=https://example.com',
+        expected: 'https://example.com',
+        description: 'Explicit URL parameter override'
+      },
+      prPreview: {
+        test: 'curl -H "Referer: https://vikingeventmgmt-pr-5.onrender.com" /test-frontend-url',
+        expected: 'https://vikingeventmgmt-pr-5.onrender.com',
+        description: 'PR preview environment via Referer header'
+      }
     },
-    expectedBehavior: {
-      localhost: 'Should detect localhost URLs from Referer or default to https://localhost:3001',
-      production: 'Should detect .onrender.com URLs from Referer or default to production',
-      prPreview: 'Should automatically detect vikingeventmgmt-pr-X.onrender.com from Referer',
-      explicit: 'Should use frontend_url parameter when provided',
-    },
+    validationResults: validateCurrentEnvironment(req),
   });
 });
+
+// Helper function to validate the current environment detection
+const validateCurrentEnvironment = (req) => {
+  const detectedUrl = getFrontendUrl(req);
+  const referer = req.get('Referer');
+  const state = req.query.state;
+  const frontendUrlParam = req.query.frontend_url;
+  
+  const validation = {
+    isWorking: true,
+    tests: [],
+    summary: 'All detection methods working correctly'
+  };
+  
+  // Test 1: Explicit parameter should always win
+  if (frontendUrlParam) {
+    const test1 = {
+      name: 'Explicit Parameter Priority',
+      passed: detectedUrl === frontendUrlParam,
+      expected: frontendUrlParam,
+      actual: detectedUrl
+    };
+    validation.tests.push(test1);
+    if (!test1.passed) validation.isWorking = false;
+  }
+  
+  // Test 2: Referer header detection for .onrender.com
+  if (referer && referer.includes('.onrender.com') && !frontendUrlParam) {
+    try {
+      const refererUrl = new URL(referer);
+      const expectedFromReferer = `${refererUrl.protocol}//${refererUrl.hostname}`;
+      const test2 = {
+        name: 'Referer Header Detection',
+        passed: detectedUrl === expectedFromReferer,
+        expected: expectedFromReferer,
+        actual: detectedUrl
+      };
+      validation.tests.push(test2);
+      if (!test2.passed) validation.isWorking = false;
+    } catch (e) {
+      validation.tests.push({
+        name: 'Referer Header Detection',
+        passed: false,
+        error: 'Invalid referer URL format'
+      });
+      validation.isWorking = false;
+    }
+  }
+  
+  // Test 3: State-based detection
+  if (state === 'dev' && !frontendUrlParam && (!referer || !referer.includes('.onrender.com'))) {
+    const test3 = {
+      name: 'Development State Detection',
+      passed: detectedUrl === 'https://localhost:3001',
+      expected: 'https://localhost:3001',
+      actual: detectedUrl
+    };
+    validation.tests.push(test3);
+    if (!test3.passed) validation.isWorking = false;
+  }
+  
+  // Test 4: Default fallback
+  if (!frontendUrlParam && (!referer || !referer.includes('.onrender.com')) && state !== 'dev') {
+    const test4 = {
+      name: 'Default Fallback',
+      passed: detectedUrl === 'https://vikingeventmgmt.onrender.com',
+      expected: 'https://vikingeventmgmt.onrender.com',
+      actual: detectedUrl
+    };
+    validation.tests.push(test4);
+    if (!test4.passed) validation.isWorking = false;
+  }
+  
+  if (!validation.isWorking) {
+    validation.summary = 'Some detection methods failing - check test results';
+  }
+  
+  return validation;
+};
 
 // Helper function to determine which detection method was used
 const getUrlDetectionMethod = (req) => {
