@@ -166,10 +166,7 @@ const transformMemberGridData = (rawData) => {
     status: true,
     data: {
       members: transformedMembers,
-      metadata: {
-        contact_groups: contactGroups,
-        column_mapping: columnMapping,
-      },
+      // Metadata removed - no longer needed since fields are flattened onto member objects
     },
   };
 };
