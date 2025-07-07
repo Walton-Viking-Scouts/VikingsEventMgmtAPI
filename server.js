@@ -144,7 +144,7 @@ const allowedOrigins = [
   'https://localhost:3001',                  // Development frontend (React mobile)
   'http://localhost:3001',                   // Development frontend (React mobile - http)
 ];
-const prPreviewPattern = /^https:\/\/vikings-event-management-front-end-pr-\d+\.onrender\.com$/;
+const prPreviewPattern = /^https:\/\/vikingeventmgmt-pr-\d+\.onrender\.com$/;
 
 app.use(cors({
   origin: createCorsOriginValidator(allowedOrigins, prPreviewPattern),
@@ -199,6 +199,85 @@ app.get('/rate-limit-status', osmController.getRateLimitStatus);
 // OAuth/Authentication endpoints
 app.get('/token', authController.getCurrentToken);
 app.post('/logout', authController.logout);
+
+
+
+// Token management endpoint for debugging (remove in production)
+app.get('/admin/tokens', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Admin endpoints disabled in production' });
+  }
+  
+  const { getTokenStats, userTokens } = require('./controllers/auth');
+  const stats = getTokenStats();
+  
+  // Get detailed token info without exposing actual tokens
+  const tokenDetails = [];
+  const now = Date.now();
+  
+  for (const [sessionId, tokenData] of userTokens.entries()) {
+    const timeToExpiry = tokenData.expires_at - now;
+    const isExpired = timeToExpiry <= 0;
+    
+    tokenDetails.push({
+      sessionId: sessionId.length > 10 ? sessionId.substring(0, 10) + '...' : sessionId,
+      tokenType: tokenData.token_type,
+      expiresAt: new Date(tokenData.expires_at).toISOString(),
+      timeToExpiry: isExpired ? 'Expired' : `${Math.floor(timeToExpiry / 1000)}s`,
+      isExpired,
+      createdAt: new Date(tokenData.created_at).toISOString(),
+      scope: tokenData.scope || 'Not specified',
+    });
+  }
+  
+  res.json({
+    summary: stats,
+    tokens: tokenDetails.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    actions: {
+      cleanup: 'POST /admin/tokens/cleanup',
+      clearAll: 'POST /admin/tokens/clear',
+    },
+  });
+});
+
+// Token cleanup endpoint
+app.post('/admin/tokens/cleanup', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Admin endpoints disabled in production' });
+  }
+  
+  const { userTokens } = require('./controllers/auth');
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const [sessionId, tokenData] of userTokens.entries()) {
+    if (now > tokenData.expires_at) {
+      userTokens.delete(sessionId);
+      cleanedCount++;
+    }
+  }
+  
+  res.json({
+    message: `Cleaned up ${cleanedCount} expired tokens`,
+    remaining: userTokens.size,
+  });
+});
+
+// Clear all tokens endpoint
+app.post('/admin/tokens/clear', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Admin endpoints disabled in production' });
+  }
+  
+  const { userTokens } = require('./controllers/auth');
+  const clearedCount = userTokens.size;
+  userTokens.clear();
+  
+  res.json({
+    message: `Cleared all ${clearedCount} tokens`,
+    remaining: 0,
+  });
+});
 
 // OSM API proxy endpoints (with rate limiting)
 app.get('/get-terms', osmController.getTerms); // Updated to GET
@@ -291,7 +370,46 @@ app.get('/test-rate-limits', createTestEndpoint({
 
 // Add OAuth environment validation endpoint for debugging
 app.get('/oauth/debug', (req, res) => {
-  res.json(createOAuthDebugResponse(req, getFrontendUrl));
+  const { getTokenStats } = require('./controllers/auth');
+  const { getSessionId } = require('./middleware/rateLimiting');
+  
+  const sessionId = getSessionId(req);
+  const tokenStats = getTokenStats();
+  
+  res.json({
+    configuration: {
+      clientId: process.env.OAUTH_CLIENT_ID ? 'Set' : 'Missing',
+      clientSecret: process.env.OAUTH_CLIENT_SECRET ? 'Set' : 'Missing',
+      backendUrl: process.env.BACKEND_URL || 'Not set',
+      frontendUrl: process.env.FRONTEND_URL || 'Not set',
+    },
+    runtime: {
+      detectedFrontendUrl: getFrontendUrl(req),
+      referer: req.get('Referer') || 'None',
+      userAgent: req.get('User-Agent') || 'None',
+      currentSessionId: sessionId,
+      hasSessionCookie: !!req.cookies?.session_id,
+      sessionCookieValue: req.cookies?.session_id || 'None',
+    },
+    tokenStorage: {
+      totalTokens: tokenStats.total,
+      activeTokens: tokenStats.active,
+      expiredTokens: tokenStats.expired,
+      memoryUsage: tokenStats.total > 0 ? 'In-memory (not persistent)' : 'Empty',
+    },
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || '3000',
+      timestamp: new Date().toISOString(),
+    },
+    warnings: [
+      tokenStats.total > 100 ? 'High token count - consider cleanup' : null,
+      tokenStats.expired > 0 ? `${tokenStats.expired} expired tokens need cleanup` : null,
+      !process.env.BACKEND_URL ? 'BACKEND_URL not set' : null,
+      !process.env.FRONTEND_URL ? 'FRONTEND_URL not set' : null,
+    ].filter(Boolean),
+    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aevent%3Awrite&response_type=code&state=debug`,
+  });
 });
 
 
@@ -342,7 +460,7 @@ app.get('/oauth/callback', async (req, res) => {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams(tokenPayload),
-          signal: global.AbortSignal?.timeout ? global.AbortSignal.timeout(30000) : undefined, // Keep timeout but remove custom headers
+          signal: global.AbortSignal?.timeout ? global.AbortSignal.timeout(30000) : undefined,
         });
         
         // If we get here, the request succeeded
@@ -369,7 +487,7 @@ app.get('/oauth/callback', async (req, res) => {
       return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
     }
 
-    // Redirect to frontend auth-success page with token as URL parameter
+    // Redirect to frontend with token as URL parameter (original working approach)
     // This allows the frontend to store the token in sessionStorage on the correct domain
     const redirectUrl = `${frontendUrl}/?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`;
     oAuthCallbackLogger.logSuccessfulRedirect(redirectUrl);

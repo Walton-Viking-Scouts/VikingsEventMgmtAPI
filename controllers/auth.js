@@ -16,6 +16,40 @@ const userTokens = new Map();
 // Import rate limiting utilities
 const { getSessionId } = require('../middleware/rateLimiting');
 
+// Import Sentry logging
+const { logger } = require('../config/sentry');
+const fallbackLogger = {
+  info: console.log,
+  warn: console.warn,
+  error: console.error,
+  debug: console.log,
+  fmt: (strings, ...values) => strings.reduce((result, string, i) => result + string + (values[i] || ''), ''),
+};
+const log = logger || fallbackLogger;
+
+// Cleanup expired tokens every 15 minutes to prevent memory leaks
+const CLEANUP_INTERVAL = 15 * 60 * 1000; // 15 minutes
+setInterval(() => {
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const [sessionId, tokenData] of userTokens.entries()) {
+    if (now > tokenData.expires_at) {
+      userTokens.delete(sessionId);
+      cleanedCount++;
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    log.info(log.fmt`Token cleanup completed: ${cleanedCount} tokens removed`, {
+      cleanedCount,
+      activeTokens: userTokens.size,
+      section: 'oauth-token-cleanup',
+      timestamp: new Date().toISOString(),
+    });
+  }
+}, CLEANUP_INTERVAL);
+
 // Get current token endpoint
 const getCurrentToken = (req, res) => {
   const sessionId = getSessionId(req);
@@ -48,11 +82,67 @@ const logout = (req, res) => {
   // Clear session cookie
   res.clearCookie('session_id');
     
-  console.log('User logged out successfully');
+  log.info(log.fmt`User logged out successfully: ${sessionId}`, {
+    sessionId,
+    section: 'oauth-logout',
+    timestamp: new Date().toISOString(),
+  });
   res.json({ success: true, message: 'Logged out successfully' });
+};
+
+// Helper function to store token (for use in OAuth callback)
+const storeToken = (sessionId, tokenData) => {
+  // Calculate expiration time (OSM tokens typically last 1 hour)
+  const expiresIn = tokenData.expires_in || 3600; // Default to 1 hour
+  const expiresAt = Date.now() + (expiresIn * 1000);
+  
+  const storedTokenData = {
+    access_token: tokenData.access_token,
+    token_type: tokenData.token_type || 'Bearer',
+    expires_at: expiresAt,
+    scope: tokenData.scope,
+    created_at: Date.now(),
+  };
+  
+  userTokens.set(sessionId, storedTokenData);
+  log.info(log.fmt`Token stored successfully: ${sessionId}`, {
+    sessionId,
+    tokenType: storedTokenData.token_type,
+    expiresAt: new Date(expiresAt).toISOString(),
+    expiresIn: expiresIn,
+    scope: tokenData.scope || 'Not specified',
+    section: 'oauth-token-storage',
+    timestamp: new Date().toISOString(),
+  });
+  
+  return storedTokenData;
+};
+
+// Get token storage statistics (for debugging)
+const getTokenStats = () => {
+  const now = Date.now();
+  let activeTokens = 0;
+  let expiredTokens = 0;
+  
+  for (const [sessionId, tokenData] of userTokens.entries()) {
+    if (now > tokenData.expires_at) {
+      expiredTokens++;
+    } else {
+      activeTokens++;
+    }
+  }
+  
+  return {
+    total: userTokens.size,
+    active: activeTokens,
+    expired: expiredTokens,
+  };
 };
 
 module.exports = {
   getCurrentToken,
   logout,
+  storeToken,
+  getTokenStats,
+  userTokens, // Export for debugging (remove in production)
 };

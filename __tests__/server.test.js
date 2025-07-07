@@ -148,9 +148,13 @@ describe('Vikings OSM Backend API', () => {
         .get('/oauth/debug')
         .expect(200);
 
-      expect(response.body).toHaveProperty('clientId');
-      expect(response.body).toHaveProperty('clientSecret');
-      expect(response.body).toHaveProperty('frontendUrl');
+      expect(response.body).toHaveProperty('configuration');
+      expect(response.body.configuration).toHaveProperty('clientId');
+      expect(response.body.configuration).toHaveProperty('clientSecret');
+      expect(response.body.configuration).toHaveProperty('frontendUrl');
+      expect(response.body).toHaveProperty('runtime');
+      expect(response.body).toHaveProperty('tokenStorage');
+      expect(response.body).toHaveProperty('environment');
     });
 
     test('OAuth callback should handle missing authorization code', async () => {
@@ -191,8 +195,9 @@ describe('Vikings OSM Backend API', () => {
         .get('/oauth/debug?state=dev')
         .expect(200);
 
-      expect(response.body).toHaveProperty('stateParam', 'dev');
-      expect(response.body.frontendUrl).toContain('localhost');
+      expect(response.body).toHaveProperty('runtime');
+      expect(response.body.runtime).toHaveProperty('detectedFrontendUrl');
+      expect(response.body.runtime.detectedFrontendUrl).toContain('localhost');
     });
   });
 });
