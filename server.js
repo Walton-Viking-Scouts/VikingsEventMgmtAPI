@@ -174,7 +174,195 @@ app.get('/rate-limit-status', osmController.getRateLimitStatus);
 app.get('/token', authController.getCurrentToken);
 app.post('/logout', authController.logout);
 
+// Add comprehensive API monitoring middleware
+const apiMonitoringMiddleware = (req, res, next) => {
+  const startTime = Date.now();
+  
+  // Start transaction for API monitoring
+  const transaction = Sentry.startTransaction({
+    name: `${req.method} ${req.path}`,
+    op: 'http.server',
+    data: {
+      method: req.method,
+      path: req.path,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer'),
+    },
+  });
+  
+  // Store transaction on request for use in route handlers
+  req.sentryTransaction = transaction;
+  
+  // Track API request
+  Sentry.addBreadcrumb({
+    category: 'api',
+    message: `API request: ${req.method} ${req.path}`,
+    level: 'info',
+    data: {
+      method: req.method,
+      path: req.path,
+      query: Object.keys(req.query).length > 0 ? req.query : undefined,
+      userAgent: req.get('User-Agent'),
+      contentType: req.get('Content-Type'),
+    },
+  });
+  
+  // Override res.json to track response
+  const originalJson = res.json;
+  res.json = function(data) {
+    const duration = Date.now() - startTime;
+    const statusCode = res.statusCode;
+    
+    // Track response metrics
+    Sentry.addBreadcrumb({
+      category: 'api',
+      message: `API response: ${statusCode} in ${duration}ms`,
+      level: statusCode >= 400 ? 'warning' : 'info',
+      data: {
+        statusCode,
+        duration,
+        method: req.method,
+        path: req.path,
+        responseSize: JSON.stringify(data).length,
+      },
+    });
+    
+    // Track slow requests
+    if (duration > 5000) {
+      Sentry.captureMessage('Slow API response detected', {
+        level: 'warning',
+        tags: {
+          section: 'performance',
+          alert_type: 'slow_response',
+        },
+        extra: {
+          method: req.method,
+          path: req.path,
+          duration,
+          statusCode,
+          userAgent: req.get('User-Agent'),
+        },
+      });
+    }
+    
+    // Track error responses
+    if (statusCode >= 400) {
+      Sentry.captureMessage('API error response', {
+        level: statusCode >= 500 ? 'error' : 'warning',
+        tags: {
+          section: 'api',
+          error_type: 'http_error',
+          status_code: statusCode,
+        },
+        extra: {
+          method: req.method,
+          path: req.path,
+          duration,
+          statusCode,
+          responseData: statusCode >= 500 ? data : undefined,
+        },
+      });
+    }
+    
+    // Set transaction status and finish
+    if (statusCode >= 500) {
+      transaction.setStatus('internal_error');
+    } else if (statusCode >= 400) {
+      transaction.setStatus('invalid_argument');
+    } else {
+      transaction.setStatus('ok');
+    }
+    
+    transaction.finish();
+    
+    return originalJson.call(this, data);
+  };
+  
+  next();
+};
 
+// Apply API monitoring middleware to all routes
+app.use(apiMonitoringMiddleware);
+
+// Enhanced health endpoint with Sentry metrics
+app.get('/health', (req, res) => {
+  const { getTokenStats } = require('./controllers/auth');
+  const stats = getTokenStats();
+  const uptime = Math.round(process.uptime());
+  
+  // Track health check
+  Sentry.addBreadcrumb({
+    category: 'health',
+    message: 'Health check requested',
+    level: 'info',
+    data: {
+      uptime,
+      tokenCount: stats.total,
+      memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    },
+  });
+  
+  const healthData = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: uptime + ' seconds',
+    environment: process.env.NODE_ENV || 'development',
+    tokenStats: {
+      total: stats.total,
+      active: stats.active,
+      expired: stats.expired,
+    },
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB',
+    },
+    configuration: {
+      backendUrl: process.env.BACKEND_URL || 'Not set',
+      frontendUrlConfigured: !!process.env.FRONTEND_URL,
+      oauthConfigured: !!(process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET),
+      sentryConfigured: !!process.env.SENTRY_DSN,
+    },
+    monitoring: {
+      sentryEnabled: !!Sentry,
+      sentryDsn: process.env.SENTRY_DSN ? 'Configured' : 'Not configured',
+      environment: process.env.NODE_ENV || 'development',
+    },
+  };
+  
+  // Alert on high memory usage
+  const memoryUsageMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+  if (memoryUsageMB > 200) {
+    Sentry.captureMessage('High memory usage detected', {
+      level: 'warning',
+      tags: {
+        section: 'health',
+        alert_type: 'high_memory',
+      },
+      extra: {
+        memoryUsageMB,
+        tokenCount: stats.total,
+        uptime,
+      },
+    });
+  }
+  
+  // Alert on high token count
+  if (stats.total > 50) {
+    Sentry.captureMessage('High token count detected', {
+      level: 'warning',
+      tags: {
+        section: 'health',
+        alert_type: 'high_token_count',
+      },
+      extra: {
+        tokenStats: stats,
+        uptime,
+      },
+    });
+  }
+  
+  res.json(healthData);
+});
 
 // Token management endpoint for debugging (remove in production)
 app.get('/admin/tokens', (req, res) => {
