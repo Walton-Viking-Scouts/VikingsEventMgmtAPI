@@ -1,5 +1,10 @@
 const request = require('supertest');
 
+// Mock environment variables before importing the server
+process.env.OAUTH_CLIENT_ID = 'test-client-id';
+process.env.OAUTH_CLIENT_SECRET = 'test-client-secret';
+process.env.NODE_ENV = 'test';
+
 // Import the server to get access to the app
 const app = require('../server');
 
