@@ -868,9 +868,20 @@ app.get('/oauth/callback', async (req, res) => {
     if (frontendUrlParam) {
       if (validateFrontendUrl(frontendUrlParam)) {
         validatedFrontendUrl = frontendUrlParam;
-        console.log('✅ Frontend URL validated:', validatedFrontendUrl);
+        logger.info('Frontend URL validated successfully', {
+          validatedUrl: validatedFrontendUrl,
+          section: 'oauth-security',
+          endpoint: '/oauth/callback',
+          timestamp: new Date().toISOString(),
+        });
       } else {
-        console.warn('⚠️ Invalid frontend URL rejected:', frontendUrlParam);
+        logger.warn('Invalid frontend URL rejected for security', {
+          rejectedUrl: frontendUrlParam,
+          section: 'oauth-security',
+          endpoint: '/oauth/callback',
+          securityAction: 'url_validation_failed',
+          timestamp: new Date().toISOString(),
+        });
         // Don't include invalid frontend URL in redirect URI
       }
     }
