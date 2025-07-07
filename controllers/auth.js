@@ -16,6 +16,17 @@ const userTokens = new Map();
 // Import rate limiting utilities
 const { getSessionId } = require('../middleware/rateLimiting');
 
+// Import Sentry logging
+const { logger } = require('../config/sentry');
+const fallbackLogger = {
+  info: console.log,
+  warn: console.warn,
+  error: console.error,
+  debug: console.log,
+  fmt: (strings, ...values) => strings.reduce((result, string, i) => result + string + (values[i] || ''), ''),
+};
+const log = logger || fallbackLogger;
+
 // Cleanup expired tokens every 15 minutes to prevent memory leaks
 const CLEANUP_INTERVAL = 15 * 60 * 1000; // 15 minutes
 setInterval(() => {
@@ -30,7 +41,12 @@ setInterval(() => {
   }
   
   if (cleanedCount > 0) {
-    console.log(`🧹 Cleaned up ${cleanedCount} expired tokens. Active tokens: ${userTokens.size}`);
+    log.info(log.fmt`Token cleanup completed: ${cleanedCount} tokens removed`, {
+      cleanedCount,
+      activeTokens: userTokens.size,
+      section: 'oauth-token-cleanup',
+      timestamp: new Date().toISOString(),
+    });
   }
 }, CLEANUP_INTERVAL);
 
@@ -66,7 +82,11 @@ const logout = (req, res) => {
   // Clear session cookie
   res.clearCookie('session_id');
     
-  console.log('User logged out successfully');
+  log.info(log.fmt`User logged out successfully: ${sessionId}`, {
+    sessionId,
+    section: 'oauth-logout',
+    timestamp: new Date().toISOString(),
+  });
   res.json({ success: true, message: 'Logged out successfully' });
 };
 
@@ -85,7 +105,15 @@ const storeToken = (sessionId, tokenData) => {
   };
   
   userTokens.set(sessionId, storedTokenData);
-  console.log(`✅ Token stored for session: ${sessionId}, expires: ${new Date(expiresAt).toISOString()}`);
+  log.info(log.fmt`Token stored successfully: ${sessionId}`, {
+    sessionId,
+    tokenType: storedTokenData.token_type,
+    expiresAt: new Date(expiresAt).toISOString(),
+    expiresIn: expiresIn,
+    scope: tokenData.scope || 'Not specified',
+    section: 'oauth-token-storage',
+    timestamp: new Date().toISOString(),
+  });
   
   return storedTokenData;
 };
