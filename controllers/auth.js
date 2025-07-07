@@ -158,8 +158,8 @@ const validateTokenFromHeader = (req, res, next) => {
     timestamp: new Date().toISOString(),
   });
   
-  // Track validation attempt in Sentry
-  if (Sentry) {
+  // Track validation attempt in Sentry only if available
+  if (Sentry && typeof Sentry.addBreadcrumb === 'function') {
     Sentry.addBreadcrumb({
       category: 'auth',
       message: 'Token validation attempt',
@@ -185,8 +185,8 @@ const validateTokenFromHeader = (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
     
-    // Track missing header in Sentry
-    if (Sentry) {
+    // Track missing header in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
       Sentry.captureMessage('Token validation failed - Authorization header missing', {
         level: 'warning',
         tags: {
@@ -221,8 +221,8 @@ const validateTokenFromHeader = (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
     
-    // Track malformed header in Sentry
-    if (Sentry) {
+    // Track malformed header in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
       Sentry.captureMessage('Token validation failed - Authorization header malformed', {
         level: 'warning',
         tags: {
@@ -259,8 +259,8 @@ const validateTokenFromHeader = (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
     
-    // Track empty token in Sentry
-    if (Sentry) {
+    // Track empty token in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
       Sentry.captureMessage('Token validation failed - Empty token', {
         level: 'warning',
         tags: {
@@ -297,8 +297,8 @@ const validateTokenFromHeader = (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
     
-    // Track token not found in Sentry
-    if (Sentry) {
+    // Track token not found in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
       Sentry.captureMessage('Token validation failed - Token not found', {
         level: 'warning',
         tags: {
@@ -335,8 +335,8 @@ const validateTokenFromHeader = (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
     
-    // Track token mismatch in Sentry
-    if (Sentry) {
+    // Track token mismatch in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
       Sentry.captureMessage('Token validation failed - Token mismatch', {
         level: 'warning',
         tags: {
@@ -379,8 +379,8 @@ const validateTokenFromHeader = (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
     
-    // Track token expiration in Sentry
-    if (Sentry) {
+    // Track token expiration in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
       Sentry.captureMessage('Token validation failed - Token expired', {
         level: 'info',
         tags: {
@@ -418,8 +418,8 @@ const validateTokenFromHeader = (req, res, next) => {
     timestamp: new Date().toISOString(),
   });
   
-  // Track successful validation in Sentry
-  if (Sentry) {
+  // Track successful validation in Sentry only if available
+  if (Sentry && typeof Sentry.addBreadcrumb === 'function') {
     Sentry.addBreadcrumb({
       category: 'auth',
       message: 'Token validation successful',
