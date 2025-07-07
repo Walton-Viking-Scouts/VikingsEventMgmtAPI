@@ -60,6 +60,14 @@ const transformMemberGridData = (rawData) => {
     });
   }
   
+  // Helper function to create safe field names
+  const createFieldName = (groupName, columnLabel) => {
+    // Convert to lowercase and replace spaces/special chars with underscores
+    const safeGroupName = groupName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const safeColumnLabel = columnLabel.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    return `${safeGroupName}_${safeColumnLabel}`;
+  };
+
   // Transform member data
   const transformedMembers = [];
   
@@ -77,16 +85,18 @@ const transformMemberGridData = (rawData) => {
       end_date: memberData.end_date,
       date_of_birth: memberData.date_of_birth,
       section_id: memberData.section_id,
+      // Keep the grouped structure for backward compatibility
       contact_groups: {},
     };
     
-    // Transform custom_data using column mapping
+    // Transform custom_data using column mapping to create flattened fields
     if (memberData.custom_data) {
       Object.entries(memberData.custom_data).forEach(([groupId, groupData]) => {
-        const normalizedGroupId = String(groupId); // Normalize groupId to string for consistent comparison
+        const normalizedGroupId = String(groupId);
         const groupInfo = contactGroups.find(g => g.group_id === normalizedGroupId);
         const groupName = groupInfo ? groupInfo.name : `Group ${normalizedGroupId}`;
         
+        // Keep grouped structure for backward compatibility
         if (!transformedMember.contact_groups[groupName]) {
           transformedMember.contact_groups[groupName] = {};
         }
@@ -95,11 +105,23 @@ const transformMemberGridData = (rawData) => {
           const groupColumnId = `${normalizedGroupId}_${columnId}`;
           const columnInfo = columnMapping[groupColumnId];
           
-          if (columnInfo) {
-            transformedMember.contact_groups[groupName][columnInfo.label] = value;
-          } else {
+          if (columnInfo && value && String(value).trim()) {
+            const columnLabel = columnInfo.label;
+            
+            // Add to grouped structure (backward compatibility)
+            transformedMember.contact_groups[groupName][columnLabel] = value;
+            
+            // Add as flattened field using group name + column label
+            const flatFieldName = createFieldName(groupName, columnLabel);
+            transformedMember[flatFieldName] = value;
+          } else if (value && String(value).trim()) {
             // Fallback for unmapped columns
-            transformedMember.contact_groups[groupName][`Column ${columnId}`] = value;
+            const fallbackLabel = `Column ${columnId}`;
+            transformedMember.contact_groups[groupName][fallbackLabel] = value;
+            
+            // Add as flattened field with fallback name
+            const flatFieldName = createFieldName(groupName, fallbackLabel);
+            transformedMember[flatFieldName] = value;
           }
         });
       });
