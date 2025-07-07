@@ -613,23 +613,23 @@ app.get('/test-frontend-url', (req, res) => {
       localhost: {
         test: '/test-frontend-url?state=dev',
         expected: 'https://localhost:3001',
-        description: 'Development environment detection'
+        description: 'Development environment detection',
       },
       production: {
         test: '/test-frontend-url',
         expected: 'https://vikingeventmgmt.onrender.com',
-        description: 'Production environment (default)'
+        description: 'Production environment (default)',
       },
       explicit: {
         test: '/test-frontend-url?frontend_url=https://example.com',
         expected: 'https://example.com',
-        description: 'Explicit URL parameter override'
+        description: 'Explicit URL parameter override',
       },
       prPreview: {
         test: 'curl -H "Referer: https://vikingeventmgmt-pr-5.onrender.com" /test-frontend-url',
         expected: 'https://vikingeventmgmt-pr-5.onrender.com',
-        description: 'PR preview environment via Referer header'
-      }
+        description: 'PR preview environment via Referer header',
+      },
     },
     validationResults: validateCurrentEnvironment(req),
   });
@@ -645,7 +645,7 @@ const validateCurrentEnvironment = (req) => {
   const validation = {
     isWorking: true,
     tests: [],
-    summary: 'All detection methods working correctly'
+    summary: 'All detection methods working correctly',
   };
   
   // Test 1: Explicit parameter should always win
@@ -654,7 +654,7 @@ const validateCurrentEnvironment = (req) => {
       name: 'Explicit Parameter Priority',
       passed: detectedUrl === frontendUrlParam,
       expected: frontendUrlParam,
-      actual: detectedUrl
+      actual: detectedUrl,
     };
     validation.tests.push(test1);
     if (!test1.passed) validation.isWorking = false;
@@ -669,7 +669,7 @@ const validateCurrentEnvironment = (req) => {
         name: 'Referer Header Detection',
         passed: detectedUrl === expectedFromReferer,
         expected: expectedFromReferer,
-        actual: detectedUrl
+        actual: detectedUrl,
       };
       validation.tests.push(test2);
       if (!test2.passed) validation.isWorking = false;
@@ -677,7 +677,7 @@ const validateCurrentEnvironment = (req) => {
       validation.tests.push({
         name: 'Referer Header Detection',
         passed: false,
-        error: 'Invalid referer URL format'
+        error: 'Invalid referer URL format',
       });
       validation.isWorking = false;
     }
@@ -689,7 +689,7 @@ const validateCurrentEnvironment = (req) => {
       name: 'Development State Detection',
       passed: detectedUrl === 'https://localhost:3001',
       expected: 'https://localhost:3001',
-      actual: detectedUrl
+      actual: detectedUrl,
     };
     validation.tests.push(test3);
     if (!test3.passed) validation.isWorking = false;
@@ -701,7 +701,7 @@ const validateCurrentEnvironment = (req) => {
       name: 'Default Fallback',
       passed: detectedUrl === 'https://vikingeventmgmt.onrender.com',
       expected: 'https://vikingeventmgmt.onrender.com',
-      actual: detectedUrl
+      actual: detectedUrl,
     };
     validation.tests.push(test4);
     if (!test4.passed) validation.isWorking = false;

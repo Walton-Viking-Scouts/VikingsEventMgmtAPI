@@ -451,12 +451,104 @@ const validateTokenFromHeader = (req, res, next) => {
 // Token validation endpoint (cross-domain compatible)
 const validateTokenEndpoint = (req, res) => {
   const authHeader = req.headers.authorization;
+  const endpoint = req.path;
+  const method = req.method;
+  const userAgent = req.get('User-Agent');
+  
+  // Log validation attempt
+  log.info(log.fmt`Token validation endpoint accessed`, {
+    endpoint,
+    method,
+    hasAuthHeader: !!authHeader,
+    userAgent,
+    section: 'token-validation-endpoint',
+    timestamp: new Date().toISOString(),
+  });
+  
+  // Track endpoint access in Sentry only if available
+  if (Sentry && typeof Sentry.addBreadcrumb === 'function') {
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      message: 'Token validation endpoint accessed',
+      level: 'info',
+      data: {
+        endpoint,
+        method,
+        hasAuthHeader: !!authHeader,
+        userAgent,
+      },
+    });
+  }
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authorization header required' });
+    log.warn(log.fmt`Token validation endpoint failed: Authorization header missing or malformed`, {
+      endpoint,
+      method,
+      userAgent,
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader ? authHeader.substring(0, 10) + '...' : null,
+      errorType: 'missing_or_malformed_header',
+      section: 'token-validation-endpoint',
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Track authorization header issues in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
+      Sentry.captureMessage('Token validation endpoint failed - Authorization header missing or malformed', {
+        level: 'warning',
+        tags: {
+          section: 'token-validation-endpoint',
+          error_type: 'missing_or_malformed_header',
+        },
+        extra: {
+          endpoint,
+          method,
+          userAgent,
+          hasAuthHeader: !!authHeader,
+          authHeaderPrefix: authHeader ? authHeader.substring(0, 10) : null,
+        },
+      });
+    }
+    
+    return res.status(401).json({ 
+      error: 'Authorization header required',
+      details: 'Missing or malformed Authorization header. Expected format: "Bearer <token>"',
+    });
   }
   
   const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  
+  if (!token || token.trim() === '') {
+    log.warn(log.fmt`Token validation endpoint failed: Empty token`, {
+      endpoint,
+      method,
+      userAgent,
+      errorType: 'empty_token',
+      section: 'token-validation-endpoint',
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Track empty token in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
+      Sentry.captureMessage('Token validation endpoint failed - Empty token', {
+        level: 'warning',
+        tags: {
+          section: 'token-validation-endpoint',
+          error_type: 'empty_token',
+        },
+        extra: {
+          endpoint,
+          method,
+          userAgent,
+        },
+      });
+    }
+    
+    return res.status(401).json({ 
+      error: 'Empty token',
+      details: 'Token cannot be empty. Please provide a valid access token.',
+    });
+  }
   
   // Find token in storage by comparing access_token values
   let foundSessionId = null;
@@ -471,19 +563,118 @@ const validateTokenEndpoint = (req, res) => {
   }
   
   if (!tokenData) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    log.warn(log.fmt`Token validation endpoint failed: Token not found`, {
+      endpoint,
+      method,
+      userAgent,
+      tokenLength: token.length,
+      totalStoredTokens: userTokens.size,
+      errorType: 'token_not_found',
+      section: 'token-validation-endpoint',
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Track token not found in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
+      Sentry.captureMessage('Token validation endpoint failed - Token not found', {
+        level: 'warning',
+        tags: {
+          section: 'token-validation-endpoint',
+          error_type: 'token_not_found',
+        },
+        extra: {
+          endpoint,
+          method,
+          userAgent,
+          tokenLength: token.length,
+          totalStoredTokens: userTokens.size,
+        },
+      });
+    }
+    
+    return res.status(401).json({ 
+      error: 'Invalid or expired token',
+      details: 'Token not found in active sessions. Please re-authenticate.',
+    });
   }
   
   // Check if token is expired
-  if (Date.now() > tokenData.expires_at) {
+  const now = Date.now();
+  if (now > tokenData.expires_at) {
     userTokens.delete(foundSessionId);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    
+    log.warn(log.fmt`Token validation endpoint failed: Token expired`, {
+      foundSessionId,
+      endpoint,
+      method,
+      userAgent,
+      expiresAt: new Date(tokenData.expires_at).toISOString(),
+      currentTime: new Date(now).toISOString(),
+      expiredBy: Math.floor((now - tokenData.expires_at) / 1000),
+      errorType: 'token_expired',
+      section: 'token-validation-endpoint',
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Track token expiration in Sentry only if available
+    if (Sentry && typeof Sentry.captureMessage === 'function') {
+      Sentry.captureMessage('Token validation endpoint failed - Token expired', {
+        level: 'info',
+        tags: {
+          section: 'token-validation-endpoint',
+          error_type: 'token_expired',
+        },
+        extra: {
+          foundSessionId: foundSessionId ? foundSessionId.substring(0, 8) + '...' : null,
+          endpoint,
+          method,
+          userAgent,
+          expiresAt: new Date(tokenData.expires_at).toISOString(),
+          expiredBy: Math.floor((now - tokenData.expires_at) / 1000),
+        },
+      });
+    }
+    
+    return res.status(401).json({ 
+      error: 'Invalid or expired token',
+      details: `Token expired ${Math.floor((now - tokenData.expires_at) / 1000)} seconds ago. Please re-authenticate.`,
+    });
+  }
+  
+  // Log successful validation
+  log.info(log.fmt`Token validation endpoint successful`, {
+    foundSessionId,
+    endpoint,
+    method,
+    userAgent,
+    tokenType: tokenData.token_type,
+    scope: tokenData.scope,
+    timeToExpiry: Math.floor((tokenData.expires_at - now) / 1000),
+    section: 'token-validation-endpoint',
+    timestamp: new Date().toISOString(),
+  });
+  
+  // Track successful validation in Sentry only if available
+  if (Sentry && typeof Sentry.addBreadcrumb === 'function') {
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      message: 'Token validation endpoint successful',
+      level: 'info',
+      data: {
+        foundSessionId: foundSessionId ? foundSessionId.substring(0, 8) + '...' : null,
+        endpoint,
+        method,
+        tokenType: tokenData.token_type,
+        scope: tokenData.scope,
+        timeToExpiry: Math.floor((tokenData.expires_at - now) / 1000),
+      },
+    });
   }
   
   res.json({
     access_token: tokenData.access_token,
     expires_at: tokenData.expires_at,
-    expires_in: Math.floor((tokenData.expires_at - Date.now()) / 1000),
+    expires_in: Math.floor((tokenData.expires_at - now) / 1000),
     sessionId: foundSessionId,
     valid: true,
   });
