@@ -25,7 +25,6 @@ const {
   conditionalLog,
   createJsonSpecEndpoint,
   createTestEndpoint,
-  createOAuthDebugResponse,
   logServerStartup,
   logAvailableEndpoints,
   createCorsOriginValidator,

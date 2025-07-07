@@ -33,9 +33,9 @@ setInterval(() => {
   const now = Date.now();
   let cleanedCount = 0;
   
-  for (const [sessionId, tokenData] of userTokens.entries()) {
+  for (const [_sessionId, tokenData] of userTokens.entries()) {
     if (now > tokenData.expires_at) {
-      userTokens.delete(sessionId);
+      userTokens.delete(_sessionId);
       cleanedCount++;
     }
   }
@@ -124,7 +124,7 @@ const getTokenStats = () => {
   let activeTokens = 0;
   let expiredTokens = 0;
   
-  for (const [sessionId, tokenData] of userTokens.entries()) {
+  for (const [_sessionId, tokenData] of userTokens.entries()) {
     if (now > tokenData.expires_at) {
       expiredTokens++;
     } else {
@@ -204,7 +204,7 @@ const validateTokenFromHeader = (req, res, next) => {
     
     return res.status(401).json({ 
       error: 'Authorization header required',
-      details: 'Missing Authorization header with Bearer token'
+      details: 'Missing Authorization header with Bearer token',
     });
   }
   
@@ -241,7 +241,7 @@ const validateTokenFromHeader = (req, res, next) => {
     
     return res.status(401).json({ 
       error: 'Invalid Authorization header format',
-      details: 'Authorization header must start with "Bearer "'
+      details: 'Authorization header must start with "Bearer "',
     });
   }
   
@@ -278,7 +278,7 @@ const validateTokenFromHeader = (req, res, next) => {
     
     return res.status(401).json({ 
       error: 'Empty token',
-      details: 'Token cannot be empty'
+      details: 'Token cannot be empty',
     });
   }
   
@@ -317,7 +317,7 @@ const validateTokenFromHeader = (req, res, next) => {
     
     return res.status(401).json({ 
       error: 'Invalid token',
-      details: 'Token not found or session expired'
+      details: 'Token not found or session expired',
     });
   }
   
@@ -356,7 +356,7 @@ const validateTokenFromHeader = (req, res, next) => {
     
     return res.status(401).json({ 
       error: 'Invalid token',
-      details: 'Token does not match stored token'
+      details: 'Token does not match stored token',
     });
   }
   
@@ -400,7 +400,7 @@ const validateTokenFromHeader = (req, res, next) => {
     
     return res.status(401).json({ 
       error: 'Token expired',
-      details: 'Token has expired, please re-authenticate'
+      details: 'Token has expired, please re-authenticate',
     });
   }
   
