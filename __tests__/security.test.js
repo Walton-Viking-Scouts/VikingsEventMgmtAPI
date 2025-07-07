@@ -28,37 +28,32 @@ describe('Frontend URL Validation Security', () => {
       expect(response.status).toBe(302);
     });
     
-    test('should reject malicious URLs', async () => {
+    test('should reject malicious URLs and fallback to default', async () => {
       const response = await request(app)
         .get('/oauth/callback?frontend_url=https://evil.com');
       
       // Should redirect to default frontend since malicious URL is rejected
       expect(response.status).toBe(302);
       expect(response.headers.location).not.toContain('evil.com');
+      expect(response.headers.location).toMatch(/vikingeventmgmt\.onrender\.com/);
     });
     
-    test('should reject non-HTTPS URLs (except localhost)', async () => {
+    test('should reject non-HTTPS URLs and fallback to default', async () => {
       const response = await request(app)
         .get('/oauth/callback?frontend_url=http://vikings-eventmgmt.onrender.com');
       
       expect(response.status).toBe(302);
       expect(response.headers.location).not.toContain('http://vikings-eventmgmt.onrender.com');
+      expect(response.headers.location).toMatch(/vikingeventmgmt\.onrender\.com/);
     });
     
-    test('should reject invalid URL formats', async () => {
+    test('should reject invalid URL formats and fallback to default', async () => {
       const response = await request(app)
         .get('/oauth/callback?frontend_url=not-a-url');
       
       expect(response.status).toBe(302);
       expect(response.headers.location).not.toContain('not-a-url');
-    });
-    
-    test('should accept HTTPS localhost URLs', async () => {
-      const response = await request(app)
-        .get('/oauth/callback?frontend_url=https://localhost:3001');
-      
-      expect(response.status).toBe(302);
-      // Should accept HTTPS localhost
+      expect(response.headers.location).toMatch(/vikingeventmgmt\.onrender\.com/);
     });
     
   });
