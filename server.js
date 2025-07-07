@@ -37,6 +37,54 @@ console.log('✅ Frontend API docs loaded:', frontendApiDocs.specs.info.title, '
 
 const app = express();
 
+// Security: Validate frontend URL against whitelist to prevent open redirect vulnerabilities
+const validateFrontendUrl = (url) => {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  
+  try {
+    const parsedUrl = new URL(url);
+    const { protocol, hostname } = parsedUrl;
+    
+    // Only allow HTTPS (except localhost for development)
+    if (protocol !== 'https:' && hostname !== 'localhost') {
+      return false;
+    }
+    
+    // Whitelist of allowed domains/hostnames
+    const allowedDomains = [
+      // Development
+      'localhost',
+      '127.0.0.1',
+      
+      // Production frontends
+      'vikings-eventmgmt.onrender.com',
+      'vikingeventmgmt.onrender.com',
+      'vikings-eventmgmt-mobile.onrender.com',
+      
+      // PR preview pattern for Render.com
+      // Matches: pr-123-vikings-eventmgmt.onrender.com, pr-456-vikingeventmgmt.onrender.com
+    ];
+    
+    // Check exact domain matches
+    if (allowedDomains.includes(hostname)) {
+      return true;
+    }
+    
+    // Check PR preview pattern: pr-{number}-{app}.onrender.com
+    const prPreviewPattern = /^pr-\d+-vikings?-?eventmgmt(-mobile)?\.onrender\.com$/;
+    if (prPreviewPattern.test(hostname)) {
+      return true;
+    }
+    
+    return false;
+    
+  } catch (_error) {
+    return false;
+  }
+};
+
 // Centralized frontend URL determination utility
 const getFrontendUrl = (req, options = {}) => {
   const { state } = req.query;
@@ -49,8 +97,48 @@ const getFrontendUrl = (req, options = {}) => {
   // Allows frontend to explicitly specify redirect URL
   const frontendUrlParam = req.query.frontend_url;
   if (frontendUrlParam) {
-    conditionalLog(enableLogging, 'log', '✅ Frontend URL from explicit parameter:', frontendUrlParam);
-    return frontendUrlParam;
+    // Security: Validate frontend URL against whitelist
+    if (validateFrontendUrl(frontendUrlParam)) {
+      conditionalLog(enableLogging, 'log', '✅ Frontend URL from parameter (validated):', frontendUrlParam);
+      return frontendUrlParam;
+    } else {
+      conditionalLog(enableLogging, 'warn', '⚠️ Invalid frontend URL parameter rejected:', frontendUrlParam);
+      // Continue to fallback methods
+    }
+  }
+  
+  // Parse state parameter for embedded frontend URL with better decoding
+  if (state && state.includes('frontend_url=')) {
+    conditionalLog(enableLogging, 'log', '🔍 State contains frontend_url, parsing...');
+    
+    // Handle both URL encoded and non-encoded state parameters
+    let decodedState = state;
+    try {
+      // Try decoding in case the state itself is URL encoded
+      decodedState = decodeURIComponent(state);
+      conditionalLog(enableLogging, 'log', '🔍 Decoded state:', decodedState);
+    } catch (_e) {
+      conditionalLog(enableLogging, 'log', '🔍 State not URL encoded, using as-is');
+    }
+    
+    // Extract frontend_url from the state parameter
+    const urlMatch = decodedState.match(/frontend_url=([^&]+)/);
+    if (urlMatch) {
+      try {
+        const extractedUrl = decodeURIComponent(urlMatch[1]);
+        // Security: Validate extracted URL against whitelist
+        if (validateFrontendUrl(extractedUrl)) {
+          conditionalLog(enableLogging, 'log', '✅ Frontend URL extracted from state (validated):', extractedUrl);
+          return extractedUrl;
+        } else {
+          conditionalLog(enableLogging, 'warn', '⚠️ Invalid frontend URL from state rejected:', extractedUrl);
+        }
+      } catch (_e) {
+        conditionalLog(enableLogging, 'log', '❌ Error decoding extracted URL:', _e.message);
+      }
+    } else {
+      conditionalLog(enableLogging, 'log', '❌ No frontend_url match found in state');
+    }
   }
   
   // 2. REFERER HEADER DETECTION (Most Reliable for Deployed Environments)
@@ -774,8 +862,21 @@ app.get('/oauth/callback', async (req, res) => {
     // IMPORTANT: redirect_uri must match exactly what was sent in the authorization request
     const baseRedirectUri = `${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`;
     const frontendUrlParam = req.query.frontend_url;
-    const fullRedirectUri = frontendUrlParam ? 
-      `${baseRedirectUri}?frontend_url=${encodeURIComponent(frontendUrlParam)}` : 
+    
+    // Security: Validate frontend URL against whitelist to prevent open redirect vulnerabilities
+    let validatedFrontendUrl = null;
+    if (frontendUrlParam) {
+      if (validateFrontendUrl(frontendUrlParam)) {
+        validatedFrontendUrl = frontendUrlParam;
+        console.log('✅ Frontend URL validated:', validatedFrontendUrl);
+      } else {
+        console.warn('⚠️ Invalid frontend URL rejected:', frontendUrlParam);
+        // Don't include invalid frontend URL in redirect URI
+      }
+    }
+    
+    const fullRedirectUri = validatedFrontendUrl ? 
+      `${baseRedirectUri}?frontend_url=${encodeURIComponent(validatedFrontendUrl)}` : 
       baseRedirectUri;
     
     const tokenPayload = {
