@@ -199,5 +199,26 @@ describe('Vikings OSM Backend API', () => {
       expect(response.body.runtime).toHaveProperty('detectedFrontendUrl');
       expect(response.body.runtime.detectedFrontendUrl).toContain('localhost');
     });
+
+    test('Token validation endpoint should work with Authorization header', async () => {
+      // This test simulates the cross-domain scenario where frontend
+      // uses Authorization header instead of session cookies
+      const response = await request(app)
+        .get('/validate-token')
+        .set('Authorization', 'Bearer fake_token_for_testing')
+        .expect(401); // Should fail with fake token
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('Invalid or expired token');
+    });
+
+    test('Token validation endpoint should require Authorization header', async () => {
+      const response = await request(app)
+        .get('/validate-token')
+        .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('Authorization header required');
+    });
   });
 });
