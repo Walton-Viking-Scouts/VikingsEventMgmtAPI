@@ -771,12 +771,19 @@ app.get('/oauth/callback', async (req, res) => {
     }
 
     // Exchange authorization code for access token
+    // IMPORTANT: redirect_uri must match exactly what was sent in the authorization request
+    const baseRedirectUri = `${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`;
+    const frontendUrlParam = req.query.frontend_url;
+    const fullRedirectUri = frontendUrlParam ? 
+      `${baseRedirectUri}?frontend_url=${encodeURIComponent(frontendUrlParam)}` : 
+      baseRedirectUri;
+    
     const tokenPayload = {
       grant_type: 'authorization_code',
       client_id: process.env.OAUTH_CLIENT_ID,
       client_secret: process.env.OAUTH_CLIENT_SECRET,
       code: code,
-      redirect_uri: `${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`,
+      redirect_uri: fullRedirectUri,
     };
     
     oAuthCallbackLogger.logTokenExchange(tokenPayload);
