@@ -43,89 +43,63 @@ const getFrontendUrl = (req, options = {}) => {
   const { state } = req.query;
   const enableLogging = options.enableLogging || false;
   
-  conditionalLog(enableLogging, 'log', '🔍 getFrontendUrl - Raw state parameter:', state);
-  conditionalLog(enableLogging, 'log', '🔍 getFrontendUrl - All query params:', req.query);
-  conditionalLog(enableLogging, 'log', '🔍 getFrontendUrl - Referer header:', req.get('Referer'));
+  conditionalLog(enableLogging, 'log', '🔍 getFrontendUrl - State:', state);
+  conditionalLog(enableLogging, 'log', '🔍 getFrontendUrl - Referer:', req.get('Referer'));
   
-  // Check for frontend_url parameter first (highest priority)
+  // 1. EXPLICIT PARAMETER (Highest Priority)
+  // Allows frontend to explicitly specify redirect URL
   const frontendUrlParam = req.query.frontend_url;
   if (frontendUrlParam) {
-    conditionalLog(enableLogging, 'log', '✅ Frontend URL from parameter:', frontendUrlParam);
+    conditionalLog(enableLogging, 'log', '✅ Frontend URL from explicit parameter:', frontendUrlParam);
     return frontendUrlParam;
   }
   
-  // Parse state parameter for embedded frontend URL with better decoding
-  if (state && state.includes('frontend_url=')) {
-    conditionalLog(enableLogging, 'log', '🔍 State contains frontend_url, parsing...');
-    
-    // Handle both URL encoded and non-encoded state parameters
-    let decodedState = state;
-    try {
-      // Try decoding in case the state itself is URL encoded
-      decodedState = decodeURIComponent(state);
-      conditionalLog(enableLogging, 'log', '🔍 Decoded state:', decodedState);
-    } catch (_e) {
-      conditionalLog(enableLogging, 'log', '🔍 State not URL encoded, using as-is');
-    }
-    
-    // Extract frontend_url from the state parameter
-    const urlMatch = decodedState.match(/frontend_url=([^&]+)/);
-    if (urlMatch) {
-      try {
-        const extractedUrl = decodeURIComponent(urlMatch[1]);
-        conditionalLog(enableLogging, 'log', '✅ Frontend URL extracted from state:', extractedUrl);
-        return extractedUrl;
-      } catch (_e) {
-        conditionalLog(enableLogging, 'log', '❌ Error decoding extracted URL:', _e.message);
-      }
-    } else {
-      conditionalLog(enableLogging, 'log', '❌ No frontend_url match found in state');
-    }
-  }
-  
-  // Check Referer header as fallback for deployed environments
+  // 2. REFERER HEADER DETECTION (Most Reliable for Deployed Environments)
+  // Automatically detects the correct frontend URL from the request origin
   const referer = req.get('Referer');
-  if (referer && referer.includes('.onrender.com')) {
+  if (referer) {
     try {
       const refererUrl = new URL(referer);
-      const frontendUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
-      conditionalLog(enableLogging, 'log', '✅ Frontend URL from Referer header:', frontendUrl);
-      return frontendUrl;
-    } catch (_e) {
-      conditionalLog(enableLogging, 'log', '❌ Error parsing Referer header:', _e.message);
+      
+      // Handle all Render.com deployments (production + PR previews)
+      if (refererUrl.hostname.includes('.onrender.com')) {
+        const detectedUrl = `${refererUrl.protocol}//${refererUrl.hostname}`;
+        conditionalLog(enableLogging, 'log', '✅ Frontend URL from Referer (Render):', detectedUrl);
+        return detectedUrl;
+      }
+      
+      // Handle localhost development
+      if (refererUrl.hostname === 'localhost' || refererUrl.hostname === '127.0.0.1') {
+        const detectedUrl = `${refererUrl.protocol}//${refererUrl.hostname}:${refererUrl.port}`;
+        conditionalLog(enableLogging, 'log', '✅ Frontend URL from Referer (localhost):', detectedUrl);
+        return detectedUrl;
+      }
+      
+    } catch (error) {
+      conditionalLog(enableLogging, 'log', '❌ Error parsing Referer header:', error.message);
     }
   }
   
-  // Environment-based detection
+  // 3. ENVIRONMENT VARIABLE (Configuration-Based)
+  // Use configured frontend URL for the deployment environment
   if (process.env.FRONTEND_URL) {
     conditionalLog(enableLogging, 'log', '✅ Frontend URL from environment variable:', process.env.FRONTEND_URL);
     return process.env.FRONTEND_URL;
   }
   
-  // Legacy state parameter support - check for base state only
-  const baseState = state ? state.split('&')[0] : state;
-  conditionalLog(enableLogging, 'log', '🔍 Base state extracted:', baseState);
-  
-  if (baseState === 'dev' || baseState === 'development' || process.env.DEV_MODE === 'true') {
-    conditionalLog(enableLogging, 'log', '✅ Development environment detected');
-    return 'https://localhost:3001';
+  // 4. STATE-BASED DETECTION (Simple Development/Production)
+  // Basic fallback for common development scenarios
+  if (state === 'dev' || state === 'development' || process.env.NODE_ENV === 'development') {
+    const devUrl = 'https://localhost:3001';
+    conditionalLog(enableLogging, 'log', '✅ Frontend URL for development:', devUrl);
+    return devUrl;
   }
   
-  // Enhanced production state detection
-  if (baseState === 'prod' || baseState === 'production' || (baseState && baseState.startsWith('prod'))) {
-    conditionalLog(enableLogging, 'log', '✅ Production environment detected (legacy)');
-    return 'https://vikingeventmgmt.onrender.com';
-  }
-  
-  // Special case for dev-to-prod (local frontend to deployed backend)
-  if (baseState === 'dev-to-prod') {
-    conditionalLog(enableLogging, 'log', '✅ Dev-to-prod environment detected');
-    return 'https://localhost:3001';
-  }
-  
-  // Default fallback
-  conditionalLog(enableLogging, 'log', '⚠️ Using default production frontend URL');
-  return 'https://vikings-eventmgmt.onrender.com';
+  // 5. DEFAULT FALLBACK (Production)
+  // Default to main production frontend
+  const defaultUrl = 'https://vikingeventmgmt.onrender.com';
+  conditionalLog(enableLogging, 'log', '⚠️ Using default production frontend URL:', defaultUrl);
+  return defaultUrl;
 };
 
 // Sentry request handler (must be first middleware) - v9 API handles this automatically
@@ -412,6 +386,80 @@ app.get('/oauth/debug', (req, res) => {
   });
 });
 
+// Frontend URL detection test endpoint
+app.get('/test-frontend-url', (req, res) => {
+  const detectedUrl = getFrontendUrl(req, { enableLogging: true });
+  
+  // Parse the current request to understand the context
+  const referer = req.get('Referer');
+  const userAgent = req.get('User-Agent');
+  
+  res.json({
+    message: 'Frontend URL Detection Test',
+    result: {
+      detectedUrl: detectedUrl,
+      detectionMethod: getUrlDetectionMethod(req),
+    },
+    requestInfo: {
+      state: req.query.state || 'None',
+      frontendUrlParam: req.query.frontend_url || 'None',
+      referer: referer || 'None',
+      userAgent: userAgent || 'None',
+      host: req.get('Host') || 'None',
+    },
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      frontendUrlEnv: process.env.FRONTEND_URL || 'Not set',
+      backendUrl: process.env.BACKEND_URL || 'Not set',
+    },
+    testScenarios: {
+      localhost: '/test-frontend-url?state=dev',
+      production: '/test-frontend-url?state=prod',
+      explicit: '/test-frontend-url?frontend_url=https://example.com',
+      prPreview: 'Test from PR preview environment (automatic via Referer)',
+    },
+    expectedBehavior: {
+      localhost: 'Should detect localhost URLs from Referer or default to https://localhost:3001',
+      production: 'Should detect .onrender.com URLs from Referer or default to production',
+      prPreview: 'Should automatically detect vikingeventmgmt-pr-X.onrender.com from Referer',
+      explicit: 'Should use frontend_url parameter when provided',
+    },
+  });
+});
+
+// Helper function to determine which detection method was used
+const getUrlDetectionMethod = (req) => {
+  const frontendUrlParam = req.query.frontend_url;
+  if (frontendUrlParam) {
+    return 'Explicit Parameter';
+  }
+  
+  const referer = req.get('Referer');
+  if (referer) {
+    try {
+      const refererUrl = new URL(referer);
+      if (refererUrl.hostname.includes('.onrender.com')) {
+        return 'Referer Header (Render.com)';
+      }
+      if (refererUrl.hostname === 'localhost' || refererUrl.hostname === '127.0.0.1') {
+        return 'Referer Header (Localhost)';
+      }
+    } catch (_e) {
+      // Invalid referer URL
+    }
+  }
+  
+  if (process.env.FRONTEND_URL) {
+    return 'Environment Variable';
+  }
+  
+  const { state } = req.query;
+  if (state === 'dev' || state === 'development' || process.env.NODE_ENV === 'development') {
+    return 'State-based (Development)';
+  }
+  
+  return 'Default Fallback (Production)';
+};
 
 // OAuth callback route to handle the authorization code from OSM
 app.get('/oauth/callback', async (req, res) => {
