@@ -62,10 +62,38 @@ const transformMemberGridData = (rawData) => {
   
   // Helper function to create safe field names
   const createFieldName = (groupName, columnLabel) => {
-    // Convert to lowercase and replace spaces/special chars with underscores
-    const safeGroupName = groupName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const safeColumnLabel = columnLabel.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    return `${safeGroupName}_${safeColumnLabel}`;
+    // Input validation - handle null/undefined inputs
+    if (!groupName || !columnLabel) {
+      console.warn('createFieldName: Invalid input', { groupName, columnLabel });
+      return null;
+    }
+    
+    // Convert to string and normalize to lowercase first
+    const normalizedGroupName = String(groupName).toLowerCase().trim();
+    const normalizedColumnLabel = String(columnLabel).toLowerCase().trim();
+    
+    // Replace non-alphanumeric characters with underscores
+    const safeGroupName = normalizedGroupName.replace(/[^a-z0-9]/g, '_');
+    const safeColumnLabel = normalizedColumnLabel.replace(/[^a-z0-9]/g, '_');
+    
+    // Remove consecutive underscores and trim leading/trailing underscores
+    const cleanGroupName = safeGroupName.replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const cleanColumnLabel = safeColumnLabel.replace(/_+/g, '_').replace(/^_|_$/g, '');
+    
+    // Ensure we don't have empty strings after cleaning
+    if (!cleanGroupName || !cleanColumnLabel) {
+      console.warn('createFieldName: Empty result after normalization', { 
+        originalGroup: groupName, 
+        originalColumn: columnLabel,
+        cleanGroup: cleanGroupName,
+        cleanColumn: cleanColumnLabel,
+      });
+      return null;
+    }
+    
+    // Use double underscore as delimiter to reduce collision risk
+    // This makes "Primary Contact" + "Email" different from "Primary" + "Contact Email"
+    return `${cleanGroupName}__${cleanColumnLabel}`;
   };
 
   // Transform member data
@@ -113,7 +141,9 @@ const transformMemberGridData = (rawData) => {
             
             // Add as flattened field using group name + column label
             const flatFieldName = createFieldName(groupName, columnLabel);
-            transformedMember[flatFieldName] = value;
+            if (flatFieldName) {
+              transformedMember[flatFieldName] = value;
+            }
           } else if (value && String(value).trim()) {
             // Fallback for unmapped columns
             const fallbackLabel = `Column ${columnId}`;
@@ -121,7 +151,9 @@ const transformMemberGridData = (rawData) => {
             
             // Add as flattened field with fallback name
             const flatFieldName = createFieldName(groupName, fallbackLabel);
-            transformedMember[flatFieldName] = value;
+            if (flatFieldName) {
+              transformedMember[flatFieldName] = value;
+            }
           }
         });
       });
