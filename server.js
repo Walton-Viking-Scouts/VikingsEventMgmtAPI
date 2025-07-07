@@ -171,7 +171,7 @@ app.get('/rate-limit-status', osmController.getRateLimitStatus);
 
 // OAuth/Authentication endpoints
 app.get('/token', authController.getCurrentToken);
-app.get('/validate-token', authController.validateTokenFromHeader);
+app.get('/validate-token', authController.validateTokenEndpoint);
 app.post('/logout', authController.logout);
 
 // Add comprehensive API monitoring middleware

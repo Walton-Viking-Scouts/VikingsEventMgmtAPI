@@ -72,47 +72,6 @@ const getCurrentToken = (req, res) => {
   });
 };
 
-// Validate token from Authorization header (cross-domain compatible)
-const validateTokenFromHeader = (req, res) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authorization header required' });
-  }
-  
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  
-  // Find token in storage by comparing access_token values
-  let foundSessionId = null;
-  let tokenData = null;
-  
-  for (const [sessionId, storedData] of userTokens.entries()) {
-    if (storedData.access_token === token) {
-      foundSessionId = sessionId;
-      tokenData = storedData;
-      break;
-    }
-  }
-  
-  if (!tokenData) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-  
-  // Check if token is expired
-  if (Date.now() > tokenData.expires_at) {
-    userTokens.delete(foundSessionId);
-    return res.status(401).json({ error: 'Token expired' });
-  }
-  
-  res.json({
-    access_token: tokenData.access_token,
-    expires_at: tokenData.expires_at,
-    expires_in: Math.floor((tokenData.expires_at - Date.now()) / 1000),
-    sessionId: foundSessionId,
-    valid: true,
-  });
-};
-
 // Logout endpoint
 const logout = (req, res) => {
   const sessionId = getSessionId(req);
@@ -489,12 +448,53 @@ const validateTokenFromHeader = (req, res, next) => {
   next();
 };
 
+// Token validation endpoint (cross-domain compatible)
+const validateTokenEndpoint = (req, res) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization header required' });
+  }
+  
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  
+  // Find token in storage by comparing access_token values
+  let foundSessionId = null;
+  let tokenData = null;
+  
+  for (const [sessionId, storedData] of userTokens.entries()) {
+    if (storedData.access_token === token) {
+      foundSessionId = sessionId;
+      tokenData = storedData;
+      break;
+    }
+  }
+  
+  if (!tokenData) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  // Check if token is expired
+  if (Date.now() > tokenData.expires_at) {
+    userTokens.delete(foundSessionId);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  res.json({
+    access_token: tokenData.access_token,
+    expires_at: tokenData.expires_at,
+    expires_in: Math.floor((tokenData.expires_at - Date.now()) / 1000),
+    sessionId: foundSessionId,
+    valid: true,
+  });
+};
+
 module.exports = {
   getCurrentToken,
-  validateTokenFromHeader,
   logout,
   storeToken,
   getTokenStats,
   userTokens, // Export for debugging (remove in production)
   validateTokenFromHeader,
+  validateTokenEndpoint,
 };
