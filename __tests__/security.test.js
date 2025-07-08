@@ -28,7 +28,7 @@ describe('Frontend URL Validation Security', () => {
     
     test('should accept valid PR preview URLs', async () => {
       const response = await request(app)
-        .get('/oauth/callback?frontend_url=https://pr-123-vikings-eventmgmt.onrender.com');
+        .get('/oauth/callback?frontend_url=https://vikingeventmgmt-pr-123.onrender.com');
       
       expect(response.status).toBe(302);
     });
