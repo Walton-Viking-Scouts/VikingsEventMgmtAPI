@@ -72,8 +72,8 @@ const validateFrontendUrl = (url) => {
       return true;
     }
     
-    // Check PR preview pattern: pr-{number}-{app}.onrender.com
-    const prPreviewPattern = /^pr-\d+-vikings?-?eventmgmt(-mobile)?\.onrender\.com$/;
+    // Check PR preview pattern: {app}-pr-{number}.onrender.com
+    const prPreviewPattern = /^vikingeventmgmt-pr-\d+\.onrender\.com$/;
     if (prPreviewPattern.test(hostname)) {
       return true;
     }
