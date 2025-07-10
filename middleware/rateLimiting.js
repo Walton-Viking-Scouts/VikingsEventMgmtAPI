@@ -254,8 +254,6 @@ const makeOSMRequest = async (url, options = {}, sessionId = null) => {
       section: 'osm-rate-limit-exceeded',
       timestamp: new Date().toISOString(),
     });
-    
-    console.log(`Retry after: ${retryAfter} seconds`);
   }
     
   return response;
