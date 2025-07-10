@@ -177,6 +177,38 @@ const makeOSMRequest = async (url, options = {}, sessionId = null) => {
   const limit = response.headers.get('X-RateLimit-Limit');
   const remaining = response.headers.get('X-RateLimit-Remaining');
   const reset = response.headers.get('X-RateLimit-Reset');
+  
+  // Check for critical OSM headers
+  const xBlocked = response.headers.get('X-Blocked');
+  const xDeprecated = response.headers.get('X-Deprecated');
+  
+  // Log critical OSM API issues to Sentry
+  if (xBlocked) {
+    log.error(log.fmt`OSM API BLOCKED: Application has been blocked by OSM`, {
+      url,
+      sessionId,
+      method: options.method || 'GET',
+      xBlocked,
+      rateLimitInfo: {
+        limit: limit ? parseInt(limit) : null,
+        remaining: remaining ? parseInt(remaining) : null,
+        reset: reset ? parseInt(reset) : null,
+      },
+      section: 'osm-critical-error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+  
+  if (xDeprecated) {
+    log.warn(log.fmt`OSM API DEPRECATED: Endpoint will be removed after ${xDeprecated}`, {
+      url,
+      sessionId,
+      method: options.method || 'GET',
+      xDeprecated,
+      section: 'osm-deprecated',
+      timestamp: new Date().toISOString(),
+    });
+  }
     
   // Store OSM rate limit info per user session
   if (sessionId && (limit || remaining || reset)) {
@@ -206,9 +238,22 @@ const makeOSMRequest = async (url, options = {}, sessionId = null) => {
     
   // Handle rate limiting response
   if (response.status === 429) {
-    // This will be handled by the OSM controller logging
     const retryAfter = response.headers.get('Retry-After') || '3600';
-    console.log(`Retry after: ${retryAfter} seconds`);
+    
+    // Log 429 errors to Sentry as high priority
+    log.error(log.fmt`OSM API Rate Limit Exceeded (429): ${url}`, {
+      url,
+      sessionId,
+      method: options.method || 'GET',
+      retryAfter,
+      rateLimitInfo: {
+        limit: limit ? parseInt(limit) : null,
+        remaining: remaining ? parseInt(remaining) : null,
+        reset: reset ? parseInt(reset) : null,
+      },
+      section: 'osm-rate-limit-exceeded',
+      timestamp: new Date().toISOString(),
+    });
   }
     
   return response;
