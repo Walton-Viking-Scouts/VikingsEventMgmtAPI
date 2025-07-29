@@ -61,6 +61,7 @@ const getSectionConfig = osmEndpoints.getSectionConfig();
 const getUserRoles = osmEndpoints.getUserRoles();
 const getEvents = osmEndpoints.getEvents();
 const getEventAttendance = osmEndpoints.getEventAttendance();
+const getEventSummary = osmEndpoints.getEventSummary();
 const getContactDetails = osmEndpoints.getContactDetails();
 const getListOfMembers = osmEndpoints.getListOfMembers();
 const getFlexiRecords = osmEndpoints.getFlexiRecords();
@@ -170,6 +171,7 @@ module.exports = {
   getUserRoles,
   getEvents,
   getEventAttendance,
+  getEventSummary,
   getContactDetails,
   getListOfMembers,
   getFlexiRecords,
