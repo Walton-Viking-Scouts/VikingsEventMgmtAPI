@@ -357,6 +357,28 @@ const osmEndpoints = {
     },
   }),
   
+  // Event summary endpoints
+  getEventSummary: () => createOSMApiHandler('getEventSummary', {
+    method: 'GET',
+    requiredParams: ['eventid'],
+    buildUrl: (req) => {
+      const { eventid } = req.query;
+      return `https://www.onlinescoutmanager.co.uk/v3/events/event/${eventid}/summary`;
+    },
+    buildRequestOptions: (_req, access_token) => ({
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json',
+      },
+    }),
+    processResponse: (data, _req) => {
+      // Process the complex event summary data structure
+      // We could potentially flatten or reorganize the data here for easier frontend consumption
+      return data;
+    },
+  }),
+
   // Startup endpoint (with special response processing)
   getStartupData: () => createStartupHandler(
     'getStartupData',

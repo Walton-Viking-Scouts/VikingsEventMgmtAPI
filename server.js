@@ -544,6 +544,7 @@ app.get('/get-section-config', osmController.getSectionConfig); // Updated to GE
 app.get('/get-user-roles', osmController.getUserRoles); // Updated to GET
 app.get('/get-events', osmController.getEvents); // Updated to GET
 app.get('/get-event-attendance', osmController.getEventAttendance);
+app.get('/get-event-summary', osmController.getEventSummary);
 app.get('/get-contact-details', osmController.getContactDetails);
 app.get('/get-list-of-members', osmController.getListOfMembers);
 app.get('/get-flexi-records', osmController.getFlexiRecords);
