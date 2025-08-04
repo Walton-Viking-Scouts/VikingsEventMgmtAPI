@@ -9,7 +9,8 @@ const {
 // Import our new utility functions
 const { osmEndpoints } = require('../utils/osmEndpointFactories');
 const { createOSMApiHandler } = require('../utils/osmApiHandler');
-const { validateFieldIdFormat, validateArrayParam } = require('../utils/validators');
+const { validateFieldIdFormat, validateArrayParam, validateFlexiRecordUpdateParams } = require('../utils/validators');
+const Sentry = require('../config/sentry');
 
 // Import existing complex functions that need custom handling
 const { transformMemberGridData } = require('./osm-legacy');
@@ -97,21 +98,75 @@ const getMembersGrid = createOSMApiHandler('getMembersGrid', {
 
 const updateFlexiRecord = createOSMApiHandler('updateFlexiRecord', {
   method: 'POST',
-  requiredParams: ['sectionid', 'scoutid', 'flexirecordid', 'columnid', 'termid', 'section'], // value can be empty for clearing
+  requiredParams: [], // Custom validation handles all parameters
   buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateScout&nototal=null',
   buildRequestOptions: (req, access_token) => {
+    try {
+      // Use centralized validation with comprehensive error logging
+      const validation = validateFlexiRecordUpdateParams(req);
+      
+      if (!validation.valid) {
+        const validationError = new Error(validation.error);
+        
+        // Log validation failure with Sentry context
+        Sentry.captureException(validationError, {
+          tags: {
+            operation: 'updateFlexiRecord',
+            validationType: 'parameter_validation',
+          },
+          contexts: {
+            request: {
+              method: req.method,
+              url: req.url,
+              body: req.body,
+            },
+            validation: {
+              missing: validation.missing,
+              error: validation.error,
+            },
+          },
+        });
+        
+        throw validationError;
+      }
+      
+      const { sectionid, scoutid, flexirecordid, columnid, value, termid, section } = req.body;
+      
+      // Log successful validation with operation context
+      Sentry.addBreadcrumb({
+        category: 'validation',
+        message: 'FlexiRecord update parameters validated successfully',
+        level: 'info',
+        data: {
+          operation: 'updateFlexiRecord',
+          sectionid,
+          scoutid,
+          flexirecordid,
+          columnid,
+          hasValue: req.body.hasOwnProperty('value'),
+          valueLength: String(value).length,
+        },
+      });
+    } catch (error) {
+      // Ensure any validation errors are properly logged and re-thrown
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'updateFlexiRecord',
+          phase: 'validation',
+        },
+        contexts: {
+          request: {
+            body: req.body,
+            headers: {
+              authorization: req.headers.authorization ? 'Bearer [REDACTED]' : 'Missing',
+            },
+          },
+        },
+      });
+      throw error;
+    }
+    
     const { sectionid, scoutid, flexirecordid, columnid, value, termid, section } = req.body;
-    
-    // Custom validation: ensure 'value' property exists (even if empty string)
-    if (!req.body.hasOwnProperty('value')) {
-      throw new Error('Missing required parameter: value (can be empty string to clear field)');
-    }
-    
-    // Custom validation for field ID format
-    const fieldValidation = validateFieldIdFormat(columnid);
-    if (!fieldValidation.valid) {
-      throw new Error(fieldValidation.error);
-    }
     
     const requestBody = new URLSearchParams({
       termid,
