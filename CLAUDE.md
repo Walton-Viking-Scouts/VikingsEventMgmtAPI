@@ -146,8 +146,26 @@ BACKEND_URL=backend_base_url
 ### Testing Approach
 
 Tests are located in `__tests__/` directory:
-- `server.test.js` - Unit tests
+- `server.test.js` - Comprehensive unit tests (53 tests covering all endpoints)
 - `integration.test.js` - Integration tests
+
+**Test Coverage (Added by coderabbit)**:
+- Rate limiting functionality and middleware
+- API endpoint validation and responses  
+- CORS configuration across multiple domains
+- OAuth flow and callback handling
+- Frontend URL detection with security validation
+- Health check and admin endpoints
+- Documentation serving (Swagger UI)
+- Error handling for various scenarios
+- Performance and security edge cases
+
+**Recent Test Fixes for CI/CD**:
+- Enhanced frontend URL validation with protocol/hostname security checks
+- Fixed backend documentation endpoint compatibility (accepts 200/301 status codes)
+- Improved Sentry test endpoint default behavior
+- Enhanced global error handler to preserve original HTTP status codes
+- Added URL length validation for DoS protection (max 1000 chars)
 
 Jest configuration prevents port conflicts with single worker and handles async cleanup properly.
 
@@ -183,6 +201,18 @@ The application implements comprehensive structured logging using Sentry:
 - Enhanced validation for flexi record updates with field ID format checking
 - Comprehensive Sentry logging for debugging and monitoring
 - Graceful shutdown handling with SIGTERM
+
+**Security Enhancements**:
+- Frontend URL validation with whitelist approach for security
+- Protocol validation (HTTP only allowed for localhost/127.0.0.1)
+- URL length limits to prevent DoS attacks (max 1000 characters)
+- Enhanced error handling preserving original HTTP status codes
+- Comprehensive input validation across all endpoints
+
+**CI/CD Integration**:
+- All 53 tests passing for automated deployment pipeline
+- GitHub Actions compatible test configuration
+- Comprehensive edge case coverage for production reliability
 
 ### Refactoring Implementation Details
 

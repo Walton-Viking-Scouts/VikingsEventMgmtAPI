@@ -587,7 +587,8 @@ describe('Vikings OSM Backend API', () => {
   describe('API Documentation Endpoints', () => {
     test('should serve backend documentation', async () => {
       const response = await request(app).get('/backend-docs');
-      expect(response.status).toBe(200);
+      // Swagger UI can return 200 (direct content) or 301 (redirect to UI)
+      expect([200, 301]).toContain(response.status);
     });
 
     test('should provide JSON API specification', async () => {

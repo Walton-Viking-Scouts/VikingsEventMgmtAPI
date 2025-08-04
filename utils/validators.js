@@ -45,6 +45,53 @@ const validateFieldIdFormat = (fieldId) => {
 };
 
 /**
+ * Validates FlexiRecord update parameters including value field that can be empty
+ * @param {Object} req - Express request object
+ * @returns {Object} Validation result with valid boolean, missing array, and error message
+ */
+const validateFlexiRecordUpdateParams = (req) => {
+  const requiredParams = ['sectionid', 'scoutid', 'flexirecordid', 'columnid', 'termid', 'section'];
+  
+  // Check standard required parameters (excluding value)
+  const standardValidation = validateRequiredParams(req, requiredParams);
+  
+  // Special validation for 'value' - must exist as property but can be empty string
+  const hasValueProperty = req.body.hasOwnProperty('value');
+  
+  if (!standardValidation.valid) {
+    return {
+      valid: false,
+      missing: standardValidation.missing,
+      error: `Missing required parameters: ${standardValidation.missing.join(', ')}`,
+    };
+  }
+  
+  if (!hasValueProperty) {
+    return {
+      valid: false,
+      missing: ['value'],
+      error: 'Missing required parameter: value (can be empty string to clear field)',
+    };
+  }
+  
+  // Validate field ID format
+  const fieldValidation = validateFieldIdFormat(req.body.columnid);
+  if (!fieldValidation.valid) {
+    return {
+      valid: false,
+      missing: [],
+      error: fieldValidation.error,
+    };
+  }
+  
+  return {
+    valid: true,
+    missing: [],
+    error: null,
+  };
+};
+
+/**
  * Validates array parameter (ensures it's an array and not empty)
  * @param {any} value - Value to validate
  * @param {string} paramName - Parameter name for error message
@@ -114,6 +161,7 @@ module.exports = {
   validateRequiredParams,
   validateAccessToken,
   validateFieldIdFormat,
+  validateFlexiRecordUpdateParams,
   validateArrayParam,
   validateSectionAndTerm,
   validateFlexiRecordParams,
