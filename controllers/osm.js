@@ -97,10 +97,15 @@ const getMembersGrid = createOSMApiHandler('getMembersGrid', {
 
 const updateFlexiRecord = createOSMApiHandler('updateFlexiRecord', {
   method: 'POST',
-  requiredParams: ['sectionid', 'scoutid', 'flexirecordid', 'columnid', 'value', 'termid', 'section'],
+  requiredParams: ['sectionid', 'scoutid', 'flexirecordid', 'columnid', 'termid', 'section'], // value can be empty for clearing
   buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateScout&nototal=null',
   buildRequestOptions: (req, access_token) => {
     const { sectionid, scoutid, flexirecordid, columnid, value, termid, section } = req.body;
+    
+    // Custom validation: ensure 'value' property exists (even if empty string)
+    if (!req.body.hasOwnProperty('value')) {
+      throw new Error('Missing required parameter: value (can be empty string to clear field)');
+    }
     
     // Custom validation for field ID format
     const fieldValidation = validateFieldIdFormat(columnid);
