@@ -97,10 +97,10 @@ const getMembersGrid = createOSMApiHandler('getMembersGrid', {
 
 const updateFlexiRecord = createOSMApiHandler('updateFlexiRecord', {
   method: 'POST',
-  requiredParams: ['sectionid', 'scoutid', 'flexirecordid', 'columnid', 'value'],
-  buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateRecord',
+  requiredParams: ['sectionid', 'scoutid', 'flexirecordid', 'columnid', 'value', 'termid', 'section'],
+  buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateScout&nototal=null',
   buildRequestOptions: (req, access_token) => {
-    const { sectionid, scoutid, flexirecordid, columnid, value } = req.body;
+    const { sectionid, scoutid, flexirecordid, columnid, value, termid, section } = req.body;
     
     // Custom validation for field ID format
     const fieldValidation = validateFieldIdFormat(columnid);
@@ -109,10 +109,12 @@ const updateFlexiRecord = createOSMApiHandler('updateFlexiRecord', {
     }
     
     const requestBody = new URLSearchParams({
+      termid,
       sectionid,
-      scoutid,
+      section,
       extraid: flexirecordid,
-      columnid,
+      scoutid,
+      column: columnid,
       value,
     });
     

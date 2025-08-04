@@ -43,12 +43,22 @@ const validateFrontendUrl = (url) => {
     return false;
   }
   
+  // Reject extremely long URLs (potential DoS or malicious intent)
+  if (url.length > 1000) {
+    return false;
+  }
+  
   try {
     const parsedUrl = new URL(url);
     const { protocol, hostname } = parsedUrl;
     
-    // Only allow HTTPS (except localhost for development)
-    if (protocol !== 'https:' && hostname !== 'localhost') {
+    // Only allow HTTP/HTTPS protocols
+    if (protocol !== 'https:' && protocol !== 'http:') {
+      return false;
+    }
+    
+    // Only allow HTTP for localhost/127.0.0.1 (development), HTTPS elsewhere
+    if (protocol === 'http:' && hostname !== 'localhost' && hostname !== '127.0.0.1') {
       return false;
     }
     
@@ -585,7 +595,7 @@ app.get('/test-sentry', createTestEndpoint({
       },
     });
   },
-}, 'type', 'error'));
+}, 'type', 'default'));
 
 // Rate limiting test endpoint for development
 app.get('/test-rate-limits', createTestEndpoint({
@@ -967,10 +977,14 @@ if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
 // Global error handler (fallback)
 app.use((err, req, res, _next) => {
   console.error('Unhandled error:', err);
-    
-  res.status(500).json({ 
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong',
+  
+  // Use the error's status code if it has one, otherwise default to 500
+  const statusCode = err.status || err.statusCode || 500;
+  const isClientError = statusCode >= 400 && statusCode < 500;
+  
+  res.status(statusCode).json({ 
+    error: isClientError ? 'Bad Request' : 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : (isClientError ? err.message : 'Something went wrong'),
   });
 });
 
