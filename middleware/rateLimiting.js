@@ -12,7 +12,16 @@ const log = logger || fallbackLogger;
 // Rate limiting tracking for our backend
 const rateLimitTracker = new Map();
 const BACKEND_RATE_LIMIT_WINDOW = 60000; // 1 minute window
-const MAX_REQUESTS_PER_WINDOW = 100; // Our backend limit per minute per user
+// Adjust limits based on environment
+const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'test' ? 1000 : 100; // Higher for tests
+
+// Per-second rate limiting to prevent burst requests
+const BACKEND_RATE_LIMIT_SECOND = 1000; // 1 second window
+const MAX_REQUESTS_PER_SECOND = process.env.NODE_ENV === 'test' ? 100 : 5; // 5 req/sec for development and production
+
+// Per-hour rate limiting to stay under OSM's 1000/hour limit
+const BACKEND_RATE_LIMIT_HOUR = 3600000; // 1 hour window (60 * 60 * 1000)
+const MAX_REQUESTS_PER_HOUR = process.env.NODE_ENV === 'test' ? 10000 : 900; // Higher for tests
 
 // OSM Rate limit tracking per user
 const osmRateLimitTracker = new Map();
@@ -22,10 +31,20 @@ setInterval(() => {
   const now = Date.now();
   // Clean backend rate limit tracking
   for (const [key, data] of rateLimitTracker.entries()) {
+    // Clean minute window requests
     data.requests = data.requests.filter(timestamp => 
       now - timestamp < BACKEND_RATE_LIMIT_WINDOW,
     );
-    if (data.requests.length === 0) {
+    // Clean second window requests
+    data.secondRequests = data.secondRequests?.filter(timestamp => 
+      now - timestamp < BACKEND_RATE_LIMIT_SECOND,
+    ) || [];
+    // Clean hour window requests
+    data.hourRequests = data.hourRequests?.filter(timestamp => 
+      now - timestamp < BACKEND_RATE_LIMIT_HOUR,
+    ) || [];
+    
+    if (data.requests.length === 0 && data.secondRequests.length === 0 && data.hourRequests.length === 0) {
       rateLimitTracker.delete(key);
     }
   }
@@ -42,39 +61,135 @@ setInterval(() => {
 const backendRateLimit = (req, res, next) => {
   const sessionId = req.cookies?.session_id || req.ip;
 
+  // Skip rate limiting for health and debug endpoints
+  if (req.path === '/health' || req.path === '/oauth/debug' || req.path.startsWith('/docs')) {
+    return next();
+  }
+
   // Ensure rateLimitTracker is initialized for the sessionId
   if (!rateLimitTracker.has(sessionId)) {
-    rateLimitTracker.set(sessionId, { requests: [] });
+    rateLimitTracker.set(sessionId, { requests: [], secondRequests: [], hourRequests: [] });
   }
 
   const userLimits = rateLimitTracker.get(sessionId);
   const now = Date.now();
 
-  // Validate userLimits and requests array
+  // Validate userLimits and requests arrays
   if (!userLimits || !Array.isArray(userLimits.requests)) {
     userLimits.requests = [];
   }
+  if (!Array.isArray(userLimits.secondRequests)) {
+    userLimits.secondRequests = [];
+  }
+  if (!Array.isArray(userLimits.hourRequests)) {
+    userLimits.hourRequests = [];
+  }
 
-  // Clean up old requests outside the rate limit window
+  // Clean up old requests outside all rate limit windows
   userLimits.requests = userLimits.requests.filter(timestamp => now - timestamp < BACKEND_RATE_LIMIT_WINDOW);
+  userLimits.secondRequests = userLimits.secondRequests.filter(timestamp => now - timestamp < BACKEND_RATE_LIMIT_SECOND);
+  userLimits.hourRequests = userLimits.hourRequests.filter(timestamp => now - timestamp < BACKEND_RATE_LIMIT_HOUR);
 
-  // Calculate remaining requests and reset time
+  // Calculate remaining requests for all windows
   const remaining = MAX_REQUESTS_PER_WINDOW - userLimits.requests.length;
+  const remainingPerSecond = MAX_REQUESTS_PER_SECOND - userLimits.secondRequests.length;
+  const remainingPerHour = MAX_REQUESTS_PER_HOUR - userLimits.hourRequests.length;
+  
   const resetTime = userLimits.requests.length > 0
     ? Math.ceil((userLimits.requests[0] + BACKEND_RATE_LIMIT_WINDOW) / 1000)
     : Math.ceil((Date.now() + BACKEND_RATE_LIMIT_WINDOW) / 1000);
+  
+  const resetTimeSecond = userLimits.secondRequests.length > 0
+    ? Math.ceil((userLimits.secondRequests[0] + BACKEND_RATE_LIMIT_SECOND) / 1000)
+    : Math.ceil((Date.now() + BACKEND_RATE_LIMIT_SECOND) / 1000);
+  
+  const resetTimeHour = userLimits.hourRequests.length > 0
+    ? Math.ceil((userLimits.hourRequests[0] + BACKEND_RATE_LIMIT_HOUR) / 1000)
+    : Math.ceil((Date.now() + BACKEND_RATE_LIMIT_HOUR) / 1000);
 
-  // Ensure rate limit headers are always set
+  // Ensure rate limit headers are always set (show the most restrictive limit)
   res.set({
+    'x-backend-ratelimit-limit-minute': MAX_REQUESTS_PER_WINDOW,
+    'x-backend-ratelimit-remaining-minute': Math.max(remaining, 0),
+    'x-backend-ratelimit-reset-minute': resetTime,
+    'x-backend-ratelimit-limit-second': MAX_REQUESTS_PER_SECOND,
+    'x-backend-ratelimit-remaining-second': Math.max(remainingPerSecond, 0),
+    'x-backend-ratelimit-reset-second': resetTimeSecond,
+    'x-backend-ratelimit-limit-hour': MAX_REQUESTS_PER_HOUR,
+    'x-backend-ratelimit-remaining-hour': Math.max(remainingPerHour, 0),
+    'x-backend-ratelimit-reset-hour': resetTimeHour,
+    // Legacy headers for backward compatibility (use most restrictive)
     'x-backend-ratelimit-limit': MAX_REQUESTS_PER_WINDOW,
-    'x-backend-ratelimit-remaining': Math.max(remaining, 0), // Ensure non-negative value
+    'x-backend-ratelimit-remaining': Math.max(Math.min(remaining, remainingPerSecond, remainingPerHour), 0),
     'x-backend-ratelimit-reset': resetTime,
   });
 
-  // If the user has exceeded the rate limit, return a 429 response
+  // Check per-second rate limit first (more restrictive)
+  if (userLimits.secondRequests.length >= MAX_REQUESTS_PER_SECOND) {
+    log.warn(log.fmt`Backend Per-Second Rate Limit Exceeded: ${req.path}`, {
+      endpoint: req.path,
+      method: req.method,
+      identifier: sessionId,
+      clientIp: req.ip || req.connection?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+      rateLimitInfo: {
+        limit: MAX_REQUESTS_PER_SECOND,
+        remaining: 0,
+        reset: resetTimeSecond,
+        window: 'per second',
+        requestCount: userLimits.secondRequests.length,
+      },
+      section: 'backend-rate-limit-second',
+      timestamp: new Date().toISOString(),
+    });
+        
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Too many requests per second.',
+      rateLimit: {
+        limit: MAX_REQUESTS_PER_SECOND,
+        remaining: 0,
+        reset: resetTimeSecond,
+        window: 'per second',
+        retryAfter: Math.ceil((resetTimeSecond * 1000 - Date.now()) / 1000),
+      },
+    });
+  }
+
+  // Check per-hour rate limit (most restrictive for total volume)
+  if (userLimits.hourRequests.length >= MAX_REQUESTS_PER_HOUR) {
+    log.warn(log.fmt`Backend Per-Hour Rate Limit Exceeded: ${req.path}`, {
+      endpoint: req.path,
+      method: req.method,
+      identifier: sessionId,
+      clientIp: req.ip || req.connection?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+      rateLimitInfo: {
+        limit: MAX_REQUESTS_PER_HOUR,
+        remaining: 0,
+        reset: resetTimeHour,
+        window: 'per hour',
+        requestCount: userLimits.hourRequests.length,
+      },
+      section: 'backend-rate-limit-hour',
+      timestamp: new Date().toISOString(),
+    });
+        
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Too many requests per hour.',
+      rateLimit: {
+        limit: MAX_REQUESTS_PER_HOUR,
+        remaining: 0,
+        reset: resetTimeHour,
+        window: 'per hour',
+        retryAfter: Math.ceil((resetTimeHour * 1000 - Date.now()) / 1000),
+      },
+    });
+  }
+
+  // Check per-minute rate limit
   if (userLimits.requests.length >= MAX_REQUESTS_PER_WINDOW) {
     // Log backend rate limiting
-    log.warn(log.fmt`Backend Rate Limit Exceeded: ${req.path}`, {
+    log.warn(log.fmt`Backend Per-Minute Rate Limit Exceeded: ${req.path}`, {
       endpoint: req.path,
       method: req.method,
       identifier: sessionId,
@@ -87,7 +202,7 @@ const backendRateLimit = (req, res, next) => {
         window: 'per minute',
         requestCount: userLimits.requests.length,
       },
-      section: 'backend-rate-limit',
+      section: 'backend-rate-limit-minute',
       timestamp: new Date().toISOString(),
     });
         
@@ -97,12 +212,16 @@ const backendRateLimit = (req, res, next) => {
         limit: MAX_REQUESTS_PER_WINDOW,
         remaining: 0,
         reset: resetTime,
+        window: 'per minute',
+        retryAfter: Math.ceil((resetTime * 1000 - Date.now()) / 1000),
       },
     });
   }
 
-  // Add the current request timestamp
+  // Add the current request timestamp to all arrays
   userLimits.requests.push(now);
+  userLimits.secondRequests.push(now);
+  userLimits.hourRequests.push(now);
 
   next();
 };
@@ -285,6 +404,22 @@ const addRateLimitInfoToResponse = (req, res, data) => {
         rateLimited: osmInfo.rateLimited || false,
       } : null,
       backend: {
+        minute: {
+          remaining: res.getHeader('x-backend-ratelimit-remaining-minute'),
+          limit: res.getHeader('x-backend-ratelimit-limit-minute'),
+          reset: res.getHeader('x-backend-ratelimit-reset-minute'),
+        },
+        second: {
+          remaining: res.getHeader('x-backend-ratelimit-remaining-second'),
+          limit: res.getHeader('x-backend-ratelimit-limit-second'),
+          reset: res.getHeader('x-backend-ratelimit-reset-second'),
+        },
+        hour: {
+          remaining: res.getHeader('x-backend-ratelimit-remaining-hour'),
+          limit: res.getHeader('x-backend-ratelimit-limit-hour'),
+          reset: res.getHeader('x-backend-ratelimit-reset-hour'),
+        },
+        // Legacy format for backward compatibility
         remaining: res.getHeader('x-backend-ratelimit-remaining'),
         limit: res.getHeader('x-backend-ratelimit-limit'),
       },
@@ -318,4 +453,8 @@ module.exports = {
   // Export constants for testing
   MAX_REQUESTS_PER_WINDOW,
   BACKEND_RATE_LIMIT_WINDOW,
+  MAX_REQUESTS_PER_SECOND,
+  BACKEND_RATE_LIMIT_SECOND,
+  MAX_REQUESTS_PER_HOUR,
+  BACKEND_RATE_LIMIT_HOUR,
 };
