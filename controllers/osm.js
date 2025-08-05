@@ -10,7 +10,15 @@ const {
 const { osmEndpoints } = require('../utils/osmEndpointFactories');
 const { createOSMApiHandler } = require('../utils/osmApiHandler');
 const { validateFieldIdFormat, validateArrayParam, validateFlexiRecordUpdateParams } = require('../utils/validators');
-const Sentry = require('../config/sentry');
+const { logger } = require('../config/sentry');
+const fallbackLogger = {
+  info: console.log,
+  warn: console.warn,
+  error: console.error,
+  debug: console.log,
+  fmt: (strings, ...values) => strings.reduce((result, string, i) => result + string + (values[i] || ''), ''),
+};
+const log = logger || fallbackLogger;
 
 // Import existing complex functions that need custom handling
 const { transformMemberGridData } = require('./osm-legacy');
@@ -101,72 +109,45 @@ const updateFlexiRecord = createOSMApiHandler('updateFlexiRecord', {
   requiredParams: [], // Custom validation handles all parameters
   buildUrl: (_req) => 'https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=updateScout&nototal=null',
   buildRequestOptions: (req, access_token) => {
-    try {
-      // Use centralized validation with comprehensive error logging
-      const validation = validateFlexiRecordUpdateParams(req);
+    // Debug log the incoming request
+    log.info('updateFlexiRecord: Incoming request', {
+      method: req.method,
+      body: req.body,
+      hasTermid: !!req.body.termid,
+      termidValue: req.body.termid,
+    });
+    
+    // Use centralized validation with comprehensive error logging
+    const validation = validateFlexiRecordUpdateParams(req);
+    
+    if (!validation.valid) {
+      const validationError = new Error(validation.error);
       
-      if (!validation.valid) {
-        const validationError = new Error(validation.error);
-        
-        // Log validation failure with Sentry context
-        Sentry.captureException(validationError, {
-          tags: {
-            operation: 'updateFlexiRecord',
-            validationType: 'parameter_validation',
-          },
-          contexts: {
-            request: {
-              method: req.method,
-              url: req.url,
-              body: req.body,
-            },
-            validation: {
-              missing: validation.missing,
-              error: validation.error,
-            },
-          },
-        });
-        
-        throw validationError;
-      }
-      
-      const { sectionid, scoutid, flexirecordid, columnid, value, termid, section } = req.body;
-      
-      // Log successful validation with operation context
-      Sentry.addBreadcrumb({
-        category: 'validation',
-        message: 'FlexiRecord update parameters validated successfully',
-        level: 'info',
-        data: {
-          operation: 'updateFlexiRecord',
-          sectionid,
-          scoutid,
-          flexirecordid,
-          columnid,
-          hasValue: req.body.hasOwnProperty('value'),
-          valueLength: String(value).length,
-        },
+      // Log validation failure using standard logger
+      log.error('updateFlexiRecord: Parameter validation failed', {
+        operation: 'updateFlexiRecord',
+        validationType: 'parameter_validation',
+        method: req.method,
+        url: req.url,
+        missing: validation.missing,
+        error: validation.error,
       });
-    } catch (error) {
-      // Ensure any validation errors are properly logged and re-thrown
-      Sentry.captureException(error, {
-        tags: {
-          operation: 'updateFlexiRecord',
-          phase: 'validation',
-        },
-        contexts: {
-          request: {
-            body: req.body,
-            headers: {
-              authorization: req.headers.authorization ? 'Bearer [REDACTED]' : 'Missing',
-            },
-          },
-        },
-      });
-      throw error;
+      
+      throw validationError;
     }
     
     const { sectionid, scoutid, flexirecordid, columnid, value, termid, section } = req.body;
+    
+    // Log successful validation with operation context
+    log.info('updateFlexiRecord: Parameters validated successfully', {
+      operation: 'updateFlexiRecord',
+      sectionid,
+      scoutid,
+      flexirecordid,
+      columnid,
+      hasValue: req.body.hasOwnProperty('value'),
+      valueLength: String(value).length,
+    });
     
     const requestBody = new URLSearchParams({
       termid,
