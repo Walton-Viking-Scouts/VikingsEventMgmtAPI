@@ -406,7 +406,14 @@ describe('Health Endpoint Comprehensive Testing', () => {
   });
 
   test('should handle environment variable configurations', async () => {
-    const originalEnv = { ...process.env };
+    // Track only the specific environment variables we modify
+    const modifiedVars = ['BACKEND_URL', 'FRONTEND_URL', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET', 'SENTRY_DSN'];
+    const originalValues = {};
+    
+    // Save original values
+    modifiedVars.forEach(key => {
+      originalValues[key] = process.env[key];
+    });
       
     // Test with all environment variables set
     process.env.BACKEND_URL = 'https://test-backend.com';
@@ -422,8 +429,14 @@ describe('Health Endpoint Comprehensive Testing', () => {
     expect(response.body.configuration.oauthConfigured).toBe(true);
     expect(response.body.configuration.sentryConfigured).toBe(true);
 
-    // Restore original environment
-    process.env = originalEnv;
+    // Restore only the specific environment variables we modified
+    modifiedVars.forEach(key => {
+      if (originalValues[key] !== undefined) {
+        process.env[key] = originalValues[key];
+      } else {
+        delete process.env[key];
+      }
+    });
   });
 });
 
