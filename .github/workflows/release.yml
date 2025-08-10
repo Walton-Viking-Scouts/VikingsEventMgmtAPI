@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 env:
-  SENTRY_HOST: https://walton-vikings.de.sentry.io
+  SENTRY_HOST: https://walton-vikings.sentry.io
   SENTRY_ORG: walton-vikings
   SENTRY_PROJECT: nodejs-api-backend
   SENTRY_URL: https://sentry.io
@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ github.ref_name }}
+    outputs:
+      version: ${{ steps.sentry-release.outputs.version }}
+      release-name: ${{ steps.sentry-release.outputs.release-name }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
@@ -38,6 +41,7 @@ jobs:
         run: npm run build
 
       - name: 📤 Create Sentry release
+        id: sentry-release
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_URL: ${{ env.SENTRY_URL }}
@@ -52,6 +56,10 @@ jobs:
           # Export clean version and release name to GitHub Actions environment for reuse
           echo "CLEAN_VERSION=$VERSION" >> $GITHUB_ENV
           echo "RELEASE_NAME=$RELEASE" >> $GITHUB_ENV
+          
+          # Also expose as step outputs for cross-job and expression context usage
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release-name=$RELEASE" >> $GITHUB_OUTPUT
           
           # Create release
           npx @sentry/cli releases new "$RELEASE"
@@ -100,5 +108,5 @@ jobs:
         run: |
           set -euo pipefail  # Bash safety flags
           
-          # Reuse the exported RELEASE_NAME from previous step
-          npx @sentry/cli releases deploys "${{ env.RELEASE_NAME }}" new -e production
+          # Use job output for consistent release name access
+          npx @sentry/cli releases deploys "${{ needs.release.outputs.release-name }}" new -e production
