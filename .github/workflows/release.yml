@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: write
+
 env:
   SENTRY_HOST: https://walton-vikings.sentry.io
   SENTRY_ORG: walton-vikings
@@ -14,8 +17,6 @@ env:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ github.ref_name }}
     outputs:
       version: ${{ steps.sentry-release.outputs.version }}
       release-name: ${{ steps.sentry-release.outputs.release-name }}
@@ -71,12 +72,10 @@ jobs:
           npx @sentry/cli releases finalize "$RELEASE"
 
       - name: 🐙 Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
             ## 🔄 Backend Release
             
@@ -85,7 +84,7 @@ jobs:
             ## 🔗 Sentry Release
             
             View detailed error tracking and performance monitoring in Sentry:
-            ${{ env.SENTRY_HOST }}/organizations/${{ env.SENTRY_ORG }}/releases/${{ env.SENTRY_PROJECT }}@${{ env.CLEAN_VERSION }}/
+            ${{ env.SENTRY_HOST }}/organizations/${{ env.SENTRY_ORG }}/releases/${{ steps.sentry-release.outputs.release-name }}/
             
             ## 📊 Issue Resolution
             
