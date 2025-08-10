@@ -18,13 +18,134 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run test:coverage` - Run tests with coverage report
 - `npm run test:ci` - Run tests in CI mode (no watch, with coverage)
 
-### Version Management
-- `npm run version:patch` - Bump patch version, commit, and push with tags
-- `npm run version:minor` - Bump minor version, commit, and push with tags
-- `npm run version:major` - Bump major version, commit, and push with tags
+### Release Management & Auto-Deployment Process
+
+**IMPORTANT:** The backend uses **auto-deployment** - code merged to `main` automatically deploys to production on Railway. This requires careful version management and testing.
+
+#### **Auto-Deployment Workflow:**
+
+**Standard Process:**
+```bash
+# 1. Feature Development (in PR)
+git checkout -b feature/my-feature
+# ... develop and test ...
+npm run lint && npm test && npm run build  # Verify before PR
+
+# 2. Version Management (BEFORE merge)
+# Update version in PR if this will be a new release
+npm run version:patch  # Updates package.json only (--no-git-tag-version)
+git add package.json package-lock.json
+git commit -m "chore: bump version to v1.x.x for production deployment"
+
+# 3. PR Review & Merge
+# Create PR → Review → Merge to main
+# ⚠️ Auto-deployment triggers immediately after merge
+
+# 4. Post-Merge Release Finalization (LOCAL SYNC)
+git checkout main && git pull origin main  # Sync with merged changes
+git tag -a v1.x.x -m "Release v1.x.x: Description of changes"
+git push origin v1.x.x
+npm run release:finalize  # Finalize Sentry release
+```
+
+#### **Production Issue Resolution Workflow:**
+
+**When fixing critical production errors:**
+
+```bash
+# 1. Create Hotfix Branch
+git checkout -b feature/hotfix-critical-issue
+
+# 2. Implement Fix with Enhanced Logging
+# Add structured logging and error context
+# Include Sentry integration for monitoring
+
+# 3. Update Version BEFORE Merge (Critical!)
+npm run version:patch
+git add package.json package-lock.json  
+git commit -m "chore: bump to v1.x.x for critical production fix"
+
+# 4. PR with Detailed Context
+# Include Sentry issue IDs and error descriptions
+# Reference production monitoring and logs
+
+# 5. Post-Merge: Align Local & Create Release Tag
+git checkout main && git pull origin main
+git tag -a v1.x.x -m "Release v1.x.x: Critical fixes for [issue description]"
+git push origin v1.x.x
+npm run release:finalize
+```
+
+#### **Release Commands:**
+
+**Development Releases:**
+```bash
+./scripts/release.sh patch  # Automated version bump + Sentry integration
+```
+
+**Production Hotfixes:**
+```bash
+# In PR branch BEFORE merge:
+npm run version:patch
+git add package.json package-lock.json
+git commit -m "chore: bump version to v1.x.x"
+
+# After merge and sync:
+git tag -a v1.x.x -m "Release message"  
+git push origin v1.x.x
+npm run release:finalize
+```
+
+**Manual Release Process (Fallback):**
+```bash
+npm run release:patch  # Test + bump patch version
+npm run release:minor  # Test + bump minor version  
+npm run release:major  # Test + bump major version
+```
+
+#### **Sentry Integration:**
+
+**Release Management:**
+```bash
+npm run release:create    # Create new Sentry release
+npm run release:finalize  # Finalize release for deployment tracking
+npm run release:deploy    # Mark deployment with commit info
+```
+
+**Monitoring & Alerting:**
+- Structured logging captures all API requests and errors
+- Rate limit monitoring with OSM API integration  
+- OAuth flow monitoring and error tracking
+- Performance profiling in production environments
+
+**Post-Deployment Monitoring:**
+- Monitor Sentry for error patterns and rate limit issues
+- Check Railway deployment logs for startup errors
+- Verify API endpoints are responding correctly
+- Monitor OAuth callback functionality
+
+#### **Version Management:**
+
+**Current Scripts:**
+- `npm run version:patch` - Bump patch version (no git operations)
+- `npm run version:minor` - Bump minor version (no git operations)
+- `npm run version:major` - Bump major version (no git operations)
+- `npm run build:release` - Build + Sentry integration (no-op for Node.js)
 - `npm run release:patch` - Run tests, then bump patch version
 - `npm run release:minor` - Run tests, then bump minor version
 - `npm run release:major` - Run tests, then bump major version
+
+**Auto-Deploy Considerations:**
+- Always bump version BEFORE merging to main
+- Test thoroughly including all 53 test cases
+- Use descriptive commit messages for deployment tracking
+- Monitor Railway logs after deployment
+
+**Critical Production Issues:**
+- Version bump is REQUIRED (distinguishes from problematic releases)
+- Include enhanced Sentry logging and error context
+- Reference specific error patterns or monitoring alerts
+- Monitor deployment success via Railway and Sentry integration
 
 Test configuration uses Jest with Node.js environment, 15-second timeout, and single worker to prevent port conflicts.
 
