@@ -1,6 +1,6 @@
 {
   "name": "vikings-osm-backend",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "Backend API for Vikings OSM Event Manager with rate limiting and OAuth",
   "main": "server.js",
   "scripts": {
