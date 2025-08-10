@@ -1,0 +1,90 @@
+name: 🚀 Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  SENTRY_ORG: walton-vikings
+  SENTRY_PROJECT: nodejs-api-backend
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run tests
+        run: |
+          npm test
+          npm run lint
+
+      - name: 🔨 Build (no-op for Node.js)
+        run: npm run build
+
+      - name: 📤 Create Sentry release
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Create release
+          npx @sentry/cli releases new vikings-osm-backend@$VERSION
+          
+          # Set commits for the release
+          npx @sentry/cli releases set-commits vikings-osm-backend@$VERSION --auto
+          
+          # Finalize release
+          npx @sentry/cli releases finalize vikings-osm-backend@$VERSION
+
+      - name: 🐙 Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## 🔄 Backend Release
+            
+            Release ${{ github.ref }}
+            
+            ## 🔗 Sentry Release
+            
+            View detailed error tracking and performance monitoring in Sentry:
+            https://walton-vikings.de.sentry.io/releases/vikings-osm-backend@${GITHUB_REF#refs/tags/v}/
+            
+            ## 📊 Issue Resolution
+            
+            This release may resolve the following Sentry issues:
+            - Check the Sentry release page for automatic issue resolution
+            - Backend API improvements and error handling enhancements
+            - OAuth flow and rate limiting optimizations
+            
+            🤖 Generated with [Claude Code](https://claude.ai/code)
+          draft: false
+          prerelease: false
+
+  deploy-notification:
+    needs: release
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: 🚀 Mark deployment in Sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          npx @sentry/cli releases deploys vikings-osm-backend@$VERSION new -e production
