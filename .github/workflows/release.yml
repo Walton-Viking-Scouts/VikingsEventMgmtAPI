@@ -6,8 +6,10 @@ on:
       - 'v*.*.*'
 
 env:
+  SENTRY_HOST: https://walton-vikings.de.sentry.io
   SENTRY_ORG: walton-vikings
   SENTRY_PROJECT: nodejs-api-backend
+  SENTRY_URL: https://de.sentry.io
 
 jobs:
   release:
@@ -36,35 +38,39 @@ jobs:
       - name: 📤 Create Sentry release
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_URL: ${{ env.SENTRY_URL }}
         run: |
-          # Extract version from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
+          set -euo pipefail  # Bash safety flags
+          
+          # Extract version and create consistent release name
+          VERSION="${{ github.ref_name }}"
+          RELEASE="${{ env.SENTRY_PROJECT }}@$VERSION"
           
           # Create release
-          npx @sentry/cli releases new vikings-osm-backend@$VERSION
+          npx @sentry/cli releases new "$RELEASE"
           
           # Set commits for the release
-          npx @sentry/cli releases set-commits vikings-osm-backend@$VERSION --auto
+          npx @sentry/cli releases set-commits "$RELEASE" --auto
           
           # Finalize release
-          npx @sentry/cli releases finalize vikings-osm-backend@$VERSION
+          npx @sentry/cli releases finalize "$RELEASE"
 
       - name: 🐙 Create GitHub Release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
           body: |
             ## 🔄 Backend Release
             
-            Release ${{ github.ref }}
+            Release ${{ github.ref_name }}
             
             ## 🔗 Sentry Release
             
             View detailed error tracking and performance monitoring in Sentry:
-            https://walton-vikings.de.sentry.io/releases/vikings-osm-backend@${GITHUB_REF#refs/tags/v}/
+            ${{ env.SENTRY_HOST }}/organizations/${{ env.SENTRY_ORG }}/releases/${{ env.SENTRY_PROJECT }}@${{ github.ref_name }}/
             
             ## 📊 Issue Resolution
             
@@ -72,8 +78,6 @@ jobs:
             - Check the Sentry release page for automatic issue resolution
             - Backend API improvements and error handling enhancements
             - OAuth flow and rate limiting optimizations
-            
-            🤖 Generated with [Claude Code](https://claude.ai/code)
           draft: false
           prerelease: false
 
@@ -85,6 +89,11 @@ jobs:
       - name: 🚀 Mark deployment in Sentry
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_URL: ${{ env.SENTRY_URL }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          npx @sentry/cli releases deploys vikings-osm-backend@$VERSION new -e production
+          set -euo pipefail  # Bash safety flags
+          
+          VERSION="${{ github.ref_name }}"
+          RELEASE="${{ env.SENTRY_PROJECT }}@$VERSION"
+          
+          npx @sentry/cli releases deploys "$RELEASE" new -e production

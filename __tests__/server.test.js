@@ -223,521 +223,521 @@ describe('Vikings OSM Backend API', () => {
   });
 });
 
-  describe('Frontend URL Validation Security', () => {
-    test('should validate localhost URLs with different ports', async () => {
-      const validLocalUrls = [
-        'http://localhost:3000',
-        'https://localhost:3001',
-        'http://127.0.0.1:8080',
-        'https://127.0.0.1:5000'
-      ];
+describe('Frontend URL Validation Security', () => {
+  test('should validate localhost URLs with different ports', async () => {
+    const validLocalUrls = [
+      'http://localhost:3000',
+      'https://localhost:3001',
+      'http://127.0.0.1:8080',
+      'https://127.0.0.1:5000',
+    ];
 
-      for (const url of validLocalUrls) {
-        const response = await request(app)
-          .get('/test-frontend-url')
-          .query({ frontend_url: url });
-        expect(response.status).toBe(200);
-        expect(response.body.result.detectedUrl).toBe(url);
-      }
-    });
-
-    test('should reject malicious URLs masquerading as valid domains', async () => {
-      const maliciousUrls = [
-        'https://vikingeventmgmt.onrender.com.evil.com',
-        'https://evil.com/vikingeventmgmt.onrender.com',
-        'https://vikingeventmgmt-onrender-com.evil.com',
-        'https://sub.vikingeventmgmt.onrender.com.fake.com'
-      ];
-
-      for (const url of maliciousUrls) {
-        const response = await request(app)
-          .get('/test-frontend-url')
-          .query({ frontend_url: url });
-        expect(response.status).toBe(200);
-        expect(response.body.result.detectedUrl).not.toBe(url);
-        expect(response.body.result.detectedUrl).toBe('https://vikingeventmgmt.onrender.com');
-      }
-    });
-
-    test('should handle edge cases in PR preview pattern matching', async () => {
-      const testCases = [
-        { url: 'https://vikingeventmgmt-pr-0.onrender.com', valid: true },
-        { url: 'https://vikingeventmgmt-pr-00123.onrender.com', valid: true },
-        { url: 'https://vikingeventmgmt-pr-999999.onrender.com', valid: true },
-        { url: 'https://vikingeventmgmt-pr-123a.onrender.com', valid: false },
-        { url: 'https://vikingeventmgmt-pr-abc123.onrender.com', valid: false },
-        { url: 'https://vikingeventmgmt-pr-123-.onrender.com', valid: false }
-      ];
-
-      for (const testCase of testCases) {
-        const response = await request(app)
-          .get('/test-frontend-url')
-          .query({ frontend_url: testCase.url });
-        expect(response.status).toBe(200);
-        
-        if (testCase.valid) {
-          expect(response.body.result.detectedUrl).toBe(testCase.url);
-        } else {
-          expect(response.body.result.detectedUrl).not.toBe(testCase.url);
-        }
-      }
-    });
-
-    test('should handle protocol edge cases', async () => {
-      const protocolTests = [
-        { url: 'ftp://localhost:3000', valid: false },
-        { url: 'file://localhost:3000', valid: false },
-        { url: 'javascript:alert(1)', valid: false },
-        { url: 'data:text/html,<script>alert(1)</script>', valid: false },
-        { url: 'mailto:admin@example.com', valid: false }
-      ];
-
-      for (const test of protocolTests) {
-        const response = await request(app)
-          .get('/test-frontend-url')
-          .query({ frontend_url: test.url });
-        expect(response.status).toBe(200);
-        expect(response.body.result.detectedUrl).not.toBe(test.url);
-      }
-    });
-  });
-
-  describe('Frontend URL Detection Edge Cases', () => {
-    test('should handle state parameter with multiple frontend_url occurrences', async () => {
-      const maliciousState = 'frontend_url=https://evil.com&legitimate_param=value&frontend_url=https://localhost:3000';
-      
+    for (const url of validLocalUrls) {
       const response = await request(app)
         .get('/test-frontend-url')
-        .query({ state: maliciousState });
-      
+        .query({ frontend_url: url });
       expect(response.status).toBe(200);
-      // Should extract the first valid URL, not the malicious one
-    });
+      expect(response.body.result.detectedUrl).toBe(url);
+    }
+  });
 
-    test('should handle deeply nested URL encoding in state', async () => {
-      const validUrl = 'https://localhost:3000';
-      const doubleEncoded = encodeURIComponent(encodeURIComponent(`frontend_url=${validUrl}`));
-      
+  test('should reject malicious URLs masquerading as valid domains', async () => {
+    const maliciousUrls = [
+      'https://vikingeventmgmt.onrender.com.evil.com',
+      'https://evil.com/vikingeventmgmt.onrender.com',
+      'https://vikingeventmgmt-onrender-com.evil.com',
+      'https://sub.vikingeventmgmt.onrender.com.fake.com',
+    ];
+
+    for (const url of maliciousUrls) {
       const response = await request(app)
         .get('/test-frontend-url')
-        .query({ state: doubleEncoded });
-      
+        .query({ frontend_url: url });
       expect(response.status).toBe(200);
-    });
-
-    test('should handle Referer header with query parameters and fragments', async () => {
-      const refererWithParams = 'https://vikingeventmgmt-pr-42.onrender.com/dashboard?tab=events&filter=upcoming#section1';
-      
-      const response = await request(app)
-        .get('/test-frontend-url')
-        .set('Referer', refererWithParams);
-      
-      expect(response.status).toBe(200);
-      expect(response.body.result.detectedUrl).toBe('https://vikingeventmgmt-pr-42.onrender.com');
-    });
-
-    test('should handle localhost Referer with non-standard ports', async () => {
-      const localhostUrls = [
-        'http://localhost:8080/app',
-        'https://localhost:4000/admin',
-        'http://127.0.0.1:9000/test'
-      ];
-
-      for (const url of localhostUrls) {
-        const response = await request(app)
-          .get('/test-frontend-url')
-          .set('Referer', url);
-        
-        expect(response.status).toBe(200);
-        const expectedUrl = new URL(url);
-        const expected = `${expectedUrl.protocol}//${expectedUrl.hostname}:${expectedUrl.port}`;
-        expect(response.body.result.detectedUrl).toBe(expected);
-      }
-    });
-
-    test('should prioritize valid URLs when multiple detection methods provide different results', async () => {
-      // Test explicit parameter vs malicious Referer
-      const response = await request(app)
-        .get('/test-frontend-url')
-        .query({ frontend_url: 'https://localhost:3000' })
-        .set('Referer', 'https://evil-site.com/fake-page');
-      
-      expect(response.status).toBe(200);
-      expect(response.body.result.detectedUrl).toBe('https://localhost:3000');
-      expect(response.body.result.detectionMethod).toBe('Explicit Parameter');
-    });
-  });
-
-  describe('Health Endpoint Comprehensive Testing', () => {
-    test('should return different memory usage patterns', async () => {
-      // Test multiple calls to see memory consistency
-      const responses = await Promise.all([
-        request(app).get('/health'),
-        request(app).get('/health'),
-        request(app).get('/health')
-      ]);
-
-      responses.forEach(response => {
-        expect(response.status).toBe(200);
-        expect(response.body.memory.used).toMatch(/^\d+ MB$/);
-        expect(response.body.memory.total).toMatch(/^\d+ MB$/);
-      });
-    });
-
-    test('should validate health endpoint structure and types', async () => {
-      const response = await request(app).get('/health');
-      
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('status', 'healthy');
-      expect(response.body).toHaveProperty('timestamp');
-      expect(new Date(response.body.timestamp)).toBeInstanceOf(Date);
-      expect(response.body).toHaveProperty('uptime');
-      expect(response.body.uptime).toMatch(/^\d+ seconds$/);
-      expect(response.body).toHaveProperty('environment');
-      expect(response.body).toHaveProperty('tokenStats');
-      expect(response.body.tokenStats).toHaveProperty('total');
-      expect(response.body.tokenStats).toHaveProperty('active');
-      expect(response.body.tokenStats).toHaveProperty('expired');
-      expect(response.body).toHaveProperty('memory');
-      expect(response.body.memory).toHaveProperty('used');
-      expect(response.body.memory).toHaveProperty('total');
-      expect(response.body).toHaveProperty('configuration');
-      expect(response.body).toHaveProperty('monitoring');
-    });
-
-    test('should handle environment variable configurations', async () => {
-      const originalEnv = { ...process.env };
-      
-      // Test with all environment variables set
-      process.env.BACKEND_URL = 'https://test-backend.com';
-      process.env.FRONTEND_URL = 'https://test-frontend.com';
-      process.env.OAUTH_CLIENT_ID = 'test-client-id';
-      process.env.OAUTH_CLIENT_SECRET = 'test-client-secret';
-      process.env.SENTRY_DSN = 'https://test@sentry.io/project';
-
-      const response = await request(app).get('/health');
-      expect(response.status).toBe(200);
-      expect(response.body.configuration.backendUrl).toBe('https://test-backend.com');
-      expect(response.body.configuration.frontendUrlConfigured).toBe(true);
-      expect(response.body.configuration.oauthConfigured).toBe(true);
-      expect(response.body.configuration.sentryConfigured).toBe(true);
-
-      // Restore original environment
-      process.env = originalEnv;
-    });
-  });
-
-  describe('OAuth Callback Advanced Testing', () => {
-    beforeEach(() => {
-      process.env.OAUTH_CLIENT_ID = 'test-client-id';
-      process.env.OAUTH_CLIENT_SECRET = 'test-client-secret';
-      process.env.BACKEND_URL = 'https://test-backend.com';
-    });
-
-    test('should handle OAuth callback with state containing frontend URL', async () => {
-      const frontendUrl = 'https://vikingeventmgmt-pr-123.onrender.com';
-      const state = `frontend_url=${encodeURIComponent(frontendUrl)}&other_data=value`;
-      
-      fetch.mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          access_token: 'test-token',
-          token_type: 'Bearer'
-        })
-      });
-
-      const response = await request(app)
-        .get('/oauth/callback')
-        .query({
-          code: 'test-code',
-          state: state
-        });
-      
-      expect(response.status).toBe(302);
-      expect(response.headers.location).toContain(frontendUrl);
-    });
-
-    test('should handle OAuth callback with malicious state parameter', async () => {
-      const maliciousState = `frontend_url=${encodeURIComponent('https://evil.com')}&legitimate=data`;
-      
-      fetch.mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          access_token: 'test-token',
-          token_type: 'Bearer'
-        })
-      });
-
-      const response = await request(app)
-        .get('/oauth/callback')
-        .query({
-          code: 'test-code',
-          state: maliciousState
-        });
-      
-      expect(response.status).toBe(302);
-      expect(response.headers.location).not.toContain('evil.com');
-    });
-
-    test('should handle token exchange with different response formats', async () => {
-      const tokenResponses = [
-        {
-          access_token: 'token1',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write'
-        },
-        {
-          access_token: 'token2',
-          token_type: 'bearer', // lowercase
-          expires_in: 7200
-        },
-        {
-          access_token: 'token3'
-          // minimal response
-        }
-      ];
-
-      for (const tokenData of tokenResponses) {
-        fetch.mockResolvedValue({
-          ok: true,
-          json: jest.fn().mockResolvedValue(tokenData)
-        });
-
-        const response = await request(app)
-          .get('/oauth/callback')
-          .query({
-            code: 'test-code',
-            state: 'test-state'
-          });
-        
-        expect(response.status).toBe(302);
-        expect(response.headers.location).toContain(`access_token=${tokenData.access_token}`);
-      }
-    });
-
-    test('should handle network timeouts and retries', async () => {
-      // Test timeout on first attempt, success on second
-      fetch
-        .mockRejectedValueOnce(new Error('ECONNRESET'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: jest.fn().mockResolvedValue({
-            access_token: 'retry-success-token',
-            token_type: 'Bearer'
-          })
-        });
-
-      const response = await request(app)
-        .get('/oauth/callback')
-        .query({
-          code: 'test-code',
-          state: 'retry-test'
-        });
-      
-      expect(response.status).toBe(302);
-      expect(response.headers.location).toContain('access_token=retry-success-token');
-      expect(fetch).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('Admin Endpoints Advanced Testing', () => {
-    test('should handle admin endpoints with different NODE_ENV values', async () => {
-      const environments = ['production', 'staging', 'test', 'development'];
-      
-      for (const env of environments) {
-        const originalEnv = process.env.NODE_ENV;
-        process.env.NODE_ENV = env;
-        
-        const response = await request(app).get('/admin/tokens');
-        
-        if (env === 'production') {
-          expect(response.status).toBe(403);
-          expect(response.body.error).toContain('disabled in production');
-        } else {
-          expect(response.status).toBe(200);
-          expect(response.body).toHaveProperty('summary');
-        }
-        
-        process.env.NODE_ENV = originalEnv;
-      }
-    });
-
-    test('should provide detailed token information in admin endpoints', async () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'development';
-      
-      const response = await request(app).get('/admin/tokens');
-      
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('summary');
-      expect(response.body.summary).toHaveProperty('total');
-      expect(response.body.summary).toHaveProperty('active');
-      expect(response.body.summary).toHaveProperty('expired');
-      expect(response.body).toHaveProperty('tokens');
-      expect(Array.isArray(response.body.tokens)).toBe(true);
-      expect(response.body).toHaveProperty('actions');
-      expect(response.body.actions).toHaveProperty('cleanup');
-      expect(response.body.actions).toHaveProperty('clearAll');
-      
-      process.env.NODE_ENV = originalEnv;
-    });
-  });
-
-  describe('API Documentation Endpoints', () => {
-    test('should serve backend documentation', async () => {
-      const response = await request(app).get('/backend-docs');
-      // Swagger UI can return 200 (direct content) or 301 (redirect to UI)
-      expect([200, 301]).toContain(response.status);
-    });
-
-    test('should provide JSON API specification', async () => {
-      const response = await request(app).get('/backend-docs.json');
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('info');
-      expect(response.body).toHaveProperty('paths');
-    });
-
-    test('should maintain backward compatibility with old API docs endpoint', async () => {
-      const response = await request(app).get('/api-docs.json');
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('info');
-      expect(response.body).toHaveProperty('paths');
-    });
-  });
-
-  describe('Test Endpoints Comprehensive Coverage', () => {
-    test('should provide Sentry test functionality', async () => {
-      const response = await request(app).get('/test-sentry');
-      
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'Sentry test endpoint');
-      expect(response.body).toHaveProperty('usage');
-      expect(response.body).toHaveProperty('sentryEnabled');
-      expect(response.body).toHaveProperty('debug');
-    });
-
-    test('should handle Sentry test with message type', async () => {
-      const response = await request(app).get('/test-sentry?type=message');
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'Test message sent to Sentry');
-    });
-
-    test('should handle Sentry test with exception type', async () => {
-      const response = await request(app).get('/test-sentry?type=exception');
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'Test exception sent to Sentry');
-    });
-
-    test('should provide rate limiting test functionality', async () => {
-      const response = await request(app).get('/test-rate-limits');
-      
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'Rate limiting test endpoint');
-      expect(response.body).toHaveProperty('usage');
-      expect(response.body).toHaveProperty('currentLimits');
-    });
-  });
-
-  describe('Error Handling and Edge Cases', () => {
-    test('should handle malformed JSON in POST requests gracefully', async () => {
-      const response = await request(app)
-        .post('/get-members-grid')
-        .set('Content-Type', 'application/json')
-        .send('{"invalid": json}');
-      
-      expect(response.status).toBe(400);
-    });
-
-    test('should handle extremely long URLs', async () => {
-      const longUrl = 'https://localhost:3000/' + 'x'.repeat(2000);
-      
-      const response = await request(app)
-        .get('/test-frontend-url')
-        .query({ frontend_url: longUrl });
-      
-      expect(response.status).toBe(200);
-      // Should fall back to default due to validation failure
+      expect(response.body.result.detectedUrl).not.toBe(url);
       expect(response.body.result.detectedUrl).toBe('https://vikingeventmgmt.onrender.com');
-    });
+    }
+  });
 
-    test('should handle concurrent requests properly', async () => {
-      const concurrentRequests = Array(5).fill(0).map(() => 
-        request(app).get('/health')
-      );
+  test('should handle edge cases in PR preview pattern matching', async () => {
+    const testCases = [
+      { url: 'https://vikingeventmgmt-pr-0.onrender.com', valid: true },
+      { url: 'https://vikingeventmgmt-pr-00123.onrender.com', valid: true },
+      { url: 'https://vikingeventmgmt-pr-999999.onrender.com', valid: true },
+      { url: 'https://vikingeventmgmt-pr-123a.onrender.com', valid: false },
+      { url: 'https://vikingeventmgmt-pr-abc123.onrender.com', valid: false },
+      { url: 'https://vikingeventmgmt-pr-123-.onrender.com', valid: false },
+    ];
 
-      const responses = await Promise.all(concurrentRequests);
+    for (const testCase of testCases) {
+      const response = await request(app)
+        .get('/test-frontend-url')
+        .query({ frontend_url: testCase.url });
+      expect(response.status).toBe(200);
+        
+      if (testCase.valid) {
+        expect(response.body.result.detectedUrl).toBe(testCase.url);
+      } else {
+        expect(response.body.result.detectedUrl).not.toBe(testCase.url);
+      }
+    }
+  });
+
+  test('should handle protocol edge cases', async () => {
+    const protocolTests = [
+      { url: 'ftp://localhost:3000', valid: false },
+      { url: 'file://localhost:3000', valid: false },
+      { url: 'javascript:alert(1)', valid: false },
+      { url: 'data:text/html,<script>alert(1)</script>', valid: false },
+      { url: 'mailto:admin@example.com', valid: false },
+    ];
+
+    for (const test of protocolTests) {
+      const response = await request(app)
+        .get('/test-frontend-url')
+        .query({ frontend_url: test.url });
+      expect(response.status).toBe(200);
+      expect(response.body.result.detectedUrl).not.toBe(test.url);
+    }
+  });
+});
+
+describe('Frontend URL Detection Edge Cases', () => {
+  test('should handle state parameter with multiple frontend_url occurrences', async () => {
+    const maliciousState = 'frontend_url=https://evil.com&legitimate_param=value&frontend_url=https://localhost:3000';
       
-      responses.forEach(response => {
-        expect(response.status).toBe(200);
-        expect(response.body.status).toBe('healthy');
-      });
+    const response = await request(app)
+      .get('/test-frontend-url')
+      .query({ state: maliciousState });
+      
+    expect(response.status).toBe(200);
+    // Should extract the first valid URL, not the malicious one
+  });
+
+  test('should handle deeply nested URL encoding in state', async () => {
+    const validUrl = 'https://localhost:3000';
+    const doubleEncoded = encodeURIComponent(encodeURIComponent(`frontend_url=${validUrl}`));
+      
+    const response = await request(app)
+      .get('/test-frontend-url')
+      .query({ state: doubleEncoded });
+      
+    expect(response.status).toBe(200);
+  });
+
+  test('should handle Referer header with query parameters and fragments', async () => {
+    const refererWithParams = 'https://vikingeventmgmt-pr-42.onrender.com/dashboard?tab=events&filter=upcoming#section1';
+      
+    const response = await request(app)
+      .get('/test-frontend-url')
+      .set('Referer', refererWithParams);
+      
+    expect(response.status).toBe(200);
+    expect(response.body.result.detectedUrl).toBe('https://vikingeventmgmt-pr-42.onrender.com');
+  });
+
+  test('should handle localhost Referer with non-standard ports', async () => {
+    const localhostUrls = [
+      'http://localhost:8080/app',
+      'https://localhost:4000/admin',
+      'http://127.0.0.1:9000/test',
+    ];
+
+    for (const url of localhostUrls) {
+      const response = await request(app)
+        .get('/test-frontend-url')
+        .set('Referer', url);
+        
+      expect(response.status).toBe(200);
+      const expectedUrl = new URL(url);
+      const expected = `${expectedUrl.protocol}//${expectedUrl.hostname}:${expectedUrl.port}`;
+      expect(response.body.result.detectedUrl).toBe(expected);
+    }
+  });
+
+  test('should prioritize valid URLs when multiple detection methods provide different results', async () => {
+    // Test explicit parameter vs malicious Referer
+    const response = await request(app)
+      .get('/test-frontend-url')
+      .query({ frontend_url: 'https://localhost:3000' })
+      .set('Referer', 'https://evil-site.com/fake-page');
+      
+    expect(response.status).toBe(200);
+    expect(response.body.result.detectedUrl).toBe('https://localhost:3000');
+    expect(response.body.result.detectionMethod).toBe('Explicit Parameter');
+  });
+});
+
+describe('Health Endpoint Comprehensive Testing', () => {
+  test('should return different memory usage patterns', async () => {
+    // Test multiple calls to see memory consistency
+    const responses = await Promise.all([
+      request(app).get('/health'),
+      request(app).get('/health'),
+      request(app).get('/health'),
+    ]);
+
+    responses.forEach(response => {
+      expect(response.status).toBe(200);
+      expect(response.body.memory.used).toMatch(/^\d+ MB$/);
+      expect(response.body.memory.total).toMatch(/^\d+ MB$/);
     });
   });
 
-  describe('CORS Advanced Configuration', () => {
-    test('should handle CORS with allowed origins', async () => {
-      const allowedOrigins = [
-        'https://vikingeventmgmt.onrender.com',
-        'https://localhost:3000',
-        'http://localhost:3001'
-      ];
+  test('should validate health endpoint structure and types', async () => {
+    const response = await request(app).get('/health');
+      
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('status', 'healthy');
+    expect(response.body).toHaveProperty('timestamp');
+    expect(new Date(response.body.timestamp)).toBeInstanceOf(Date);
+    expect(response.body).toHaveProperty('uptime');
+    expect(response.body.uptime).toMatch(/^\d+ seconds$/);
+    expect(response.body).toHaveProperty('environment');
+    expect(response.body).toHaveProperty('tokenStats');
+    expect(response.body.tokenStats).toHaveProperty('total');
+    expect(response.body.tokenStats).toHaveProperty('active');
+    expect(response.body.tokenStats).toHaveProperty('expired');
+    expect(response.body).toHaveProperty('memory');
+    expect(response.body.memory).toHaveProperty('used');
+    expect(response.body.memory).toHaveProperty('total');
+    expect(response.body).toHaveProperty('configuration');
+    expect(response.body).toHaveProperty('monitoring');
+  });
 
-      for (const origin of allowedOrigins) {
-        const response = await request(app)
-          .get('/health')
-          .set('Origin', origin);
-        
-        expect(response.status).toBe(200);
-      }
+  test('should handle environment variable configurations', async () => {
+    const originalEnv = { ...process.env };
+      
+    // Test with all environment variables set
+    process.env.BACKEND_URL = 'https://test-backend.com';
+    process.env.FRONTEND_URL = 'https://test-frontend.com';
+    process.env.OAUTH_CLIENT_ID = 'test-client-id';
+    process.env.OAUTH_CLIENT_SECRET = 'test-client-secret';
+    process.env.SENTRY_DSN = 'https://test@sentry.io/project';
+
+    const response = await request(app).get('/health');
+    expect(response.status).toBe(200);
+    expect(response.body.configuration.backendUrl).toBe('https://test-backend.com');
+    expect(response.body.configuration.frontendUrlConfigured).toBe(true);
+    expect(response.body.configuration.oauthConfigured).toBe(true);
+    expect(response.body.configuration.sentryConfigured).toBe(true);
+
+    // Restore original environment
+    process.env = originalEnv;
+  });
+});
+
+describe('OAuth Callback Advanced Testing', () => {
+  beforeEach(() => {
+    process.env.OAUTH_CLIENT_ID = 'test-client-id';
+    process.env.OAUTH_CLIENT_SECRET = 'test-client-secret';
+    process.env.BACKEND_URL = 'https://test-backend.com';
+  });
+
+  test('should handle OAuth callback with state containing frontend URL', async () => {
+    const frontendUrl = 'https://vikingeventmgmt-pr-123.onrender.com';
+    const state = `frontend_url=${encodeURIComponent(frontendUrl)}&other_data=value`;
+      
+    fetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        access_token: 'test-token',
+        token_type: 'Bearer',
+      }),
     });
 
-    test('should handle CORS preflight requests', async () => {
-      const response = await request(app)
-        .options('/health')
-        .set('Origin', 'https://vikingeventmgmt.onrender.com')
-        .set('Access-Control-Request-Method', 'GET');
+    const response = await request(app)
+      .get('/oauth/callback')
+      .query({
+        code: 'test-code',
+        state: state,
+      });
       
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toContain(frontendUrl);
+  });
+
+  test('should handle OAuth callback with malicious state parameter', async () => {
+    const maliciousState = `frontend_url=${encodeURIComponent('https://evil.com')}&legitimate=data`;
+      
+    fetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        access_token: 'test-token',
+        token_type: 'Bearer',
+      }),
+    });
+
+    const response = await request(app)
+      .get('/oauth/callback')
+      .query({
+        code: 'test-code',
+        state: maliciousState,
+      });
+      
+    expect(response.status).toBe(302);
+    expect(response.headers.location).not.toContain('evil.com');
+  });
+
+  test('should handle token exchange with different response formats', async () => {
+    const tokenResponses = [
+      {
+        access_token: 'token1',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      },
+      {
+        access_token: 'token2',
+        token_type: 'bearer', // lowercase
+        expires_in: 7200,
+      },
+      {
+        access_token: 'token3',
+        // minimal response
+      },
+    ];
+
+    for (const tokenData of tokenResponses) {
+      fetch.mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(tokenData),
+      });
+
+      const response = await request(app)
+        .get('/oauth/callback')
+        .query({
+          code: 'test-code',
+          state: 'test-state',
+        });
+        
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toContain(`access_token=${tokenData.access_token}`);
+    }
+  });
+
+  test('should handle network timeouts and retries', async () => {
+    // Test timeout on first attempt, success on second
+    fetch
+      .mockRejectedValueOnce(new Error('ECONNRESET'))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          access_token: 'retry-success-token',
+          token_type: 'Bearer',
+        }),
+      });
+
+    const response = await request(app)
+      .get('/oauth/callback')
+      .query({
+        code: 'test-code',
+        state: 'retry-test',
+      });
+      
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toContain('access_token=retry-success-token');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Admin Endpoints Advanced Testing', () => {
+  test('should handle admin endpoints with different NODE_ENV values', async () => {
+    const environments = ['production', 'staging', 'test', 'development'];
+      
+    for (const env of environments) {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = env;
+        
+      const response = await request(app).get('/admin/tokens');
+        
+      if (env === 'production') {
+        expect(response.status).toBe(403);
+        expect(response.body.error).toContain('disabled in production');
+      } else {
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty('summary');
+      }
+        
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
+
+  test('should provide detailed token information in admin endpoints', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+      
+    const response = await request(app).get('/admin/tokens');
+      
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('summary');
+    expect(response.body.summary).toHaveProperty('total');
+    expect(response.body.summary).toHaveProperty('active');
+    expect(response.body.summary).toHaveProperty('expired');
+    expect(response.body).toHaveProperty('tokens');
+    expect(Array.isArray(response.body.tokens)).toBe(true);
+    expect(response.body).toHaveProperty('actions');
+    expect(response.body.actions).toHaveProperty('cleanup');
+    expect(response.body.actions).toHaveProperty('clearAll');
+      
+    process.env.NODE_ENV = originalEnv;
+  });
+});
+
+describe('API Documentation Endpoints', () => {
+  test('should serve backend documentation', async () => {
+    const response = await request(app).get('/backend-docs');
+    // Swagger UI can return 200 (direct content) or 301 (redirect to UI)
+    expect([200, 301]).toContain(response.status);
+  });
+
+  test('should provide JSON API specification', async () => {
+    const response = await request(app).get('/backend-docs.json');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('info');
+    expect(response.body).toHaveProperty('paths');
+  });
+
+  test('should maintain backward compatibility with old API docs endpoint', async () => {
+    const response = await request(app).get('/api-docs.json');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('info');
+    expect(response.body).toHaveProperty('paths');
+  });
+});
+
+describe('Test Endpoints Comprehensive Coverage', () => {
+  test('should provide Sentry test functionality', async () => {
+    const response = await request(app).get('/test-sentry');
+      
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('message', 'Sentry test endpoint');
+    expect(response.body).toHaveProperty('usage');
+    expect(response.body).toHaveProperty('sentryEnabled');
+    expect(response.body).toHaveProperty('debug');
+  });
+
+  test('should handle Sentry test with message type', async () => {
+    const response = await request(app).get('/test-sentry?type=message');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('message', 'Test message sent to Sentry');
+  });
+
+  test('should handle Sentry test with exception type', async () => {
+    const response = await request(app).get('/test-sentry?type=exception');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('message', 'Test exception sent to Sentry');
+  });
+
+  test('should provide rate limiting test functionality', async () => {
+    const response = await request(app).get('/test-rate-limits');
+      
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('message', 'Rate limiting test endpoint');
+    expect(response.body).toHaveProperty('usage');
+    expect(response.body).toHaveProperty('currentLimits');
+  });
+});
+
+describe('Error Handling and Edge Cases', () => {
+  test('should handle malformed JSON in POST requests gracefully', async () => {
+    const response = await request(app)
+      .post('/get-members-grid')
+      .set('Content-Type', 'application/json')
+      .send('{"invalid": json}');
+      
+    expect(response.status).toBe(400);
+  });
+
+  test('should handle extremely long URLs', async () => {
+    const longUrl = 'https://localhost:3000/' + 'x'.repeat(2000);
+      
+    const response = await request(app)
+      .get('/test-frontend-url')
+      .query({ frontend_url: longUrl });
+      
+    expect(response.status).toBe(200);
+    // Should fall back to default due to validation failure
+    expect(response.body.result.detectedUrl).toBe('https://vikingeventmgmt.onrender.com');
+  });
+
+  test('should handle concurrent requests properly', async () => {
+    const concurrentRequests = Array(5).fill(0).map(() => 
+      request(app).get('/health'),
+    );
+
+    const responses = await Promise.all(concurrentRequests);
+      
+    responses.forEach(response => {
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('healthy');
+    });
+  });
+});
+
+describe('CORS Advanced Configuration', () => {
+  test('should handle CORS with allowed origins', async () => {
+    const allowedOrigins = [
+      'https://vikingeventmgmt.onrender.com',
+      'https://localhost:3000',
+      'http://localhost:3001',
+    ];
+
+    for (const origin of allowedOrigins) {
+      const response = await request(app)
+        .get('/health')
+        .set('Origin', origin);
+        
+      expect(response.status).toBe(200);
+    }
+  });
+
+  test('should handle CORS preflight requests', async () => {
+    const response = await request(app)
+      .options('/health')
+      .set('Origin', 'https://vikingeventmgmt.onrender.com')
+      .set('Access-Control-Request-Method', 'GET');
+      
+    expect(response.status).toBe(200);
+  });
+});
+
+describe('Performance Testing', () => {
+  test('should handle rapid sequential requests efficiently', async () => {
+    const startTime = Date.now();
+    const requests = [];
+      
+    for (let i = 0; i < 10; i++) {
+      requests.push(request(app).get('/health'));
+    }
+      
+    const responses = await Promise.all(requests);
+    const endTime = Date.now();
+      
+    expect(endTime - startTime).toBeLessThan(3000); // Should complete within 3 seconds
+      
+    responses.forEach(response => {
       expect(response.status).toBe(200);
     });
   });
 
-  describe('Performance Testing', () => {
-    test('should handle rapid sequential requests efficiently', async () => {
-      const startTime = Date.now();
-      const requests = [];
-      
-      for (let i = 0; i < 10; i++) {
-        requests.push(request(app).get('/health'));
-      }
-      
-      const responses = await Promise.all(requests);
-      const endTime = Date.now();
-      
-      expect(endTime - startTime).toBeLessThan(3000); // Should complete within 3 seconds
-      
-      responses.forEach(response => {
-        expect(response.status).toBe(200);
-      });
-    });
+  test('should maintain performance under mixed endpoint load', async () => {
+    const mixedRequests = [
+      request(app).get('/health'),
+      request(app).get('/rate-limit-status'),
+      request(app).get('/oauth/debug'),
+      request(app).get('/test-frontend-url'),
+      request(app).get('/backend-docs.json'),
+    ];
 
-    test('should maintain performance under mixed endpoint load', async () => {
-      const mixedRequests = [
-        request(app).get('/health'),
-        request(app).get('/rate-limit-status'),
-        request(app).get('/oauth/debug'),
-        request(app).get('/test-frontend-url'),
-        request(app).get('/backend-docs.json')
-      ];
+    const startTime = Date.now();
+    const responses = await Promise.all(mixedRequests);
+    const endTime = Date.now();
 
-      const startTime = Date.now();
-      const responses = await Promise.all(mixedRequests);
-      const endTime = Date.now();
-
-      expect(endTime - startTime).toBeLessThan(2000);
+    expect(endTime - startTime).toBeLessThan(2000);
       
-      responses.forEach(response => {
-        expect(response.status).toBe(200);
-      });
+    responses.forEach(response => {
+      expect(response.status).toBe(200);
     });
   });
+});
