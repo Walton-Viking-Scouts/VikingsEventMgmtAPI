@@ -9,7 +9,7 @@ env:
   SENTRY_HOST: https://walton-vikings.de.sentry.io
   SENTRY_ORG: walton-vikings
   SENTRY_PROJECT: nodejs-api-backend
-  SENTRY_URL: https://eu.sentry.io
+  SENTRY_URL: https://sentry.io
 
 jobs:
   release:
