@@ -49,8 +49,9 @@ jobs:
           VERSION=${VERSION#v}  # Remove 'v' prefix if present
           RELEASE="${{ env.SENTRY_PROJECT }}@$VERSION"
           
-          # Export clean version to GitHub Actions environment for use in release body
+          # Export clean version and release name to GitHub Actions environment for reuse
           echo "CLEAN_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE" >> $GITHUB_ENV
           
           # Create release
           npx @sentry/cli releases new "$RELEASE"
@@ -99,8 +100,5 @@ jobs:
         run: |
           set -euo pipefail  # Bash safety flags
           
-          VERSION="${{ github.ref_name }}"
-          VERSION=${VERSION#v}  # Remove 'v' prefix if present
-          RELEASE="${{ env.SENTRY_PROJECT }}@$VERSION"
-          
-          npx @sentry/cli releases deploys "$RELEASE" new -e production
+          # Reuse the exported RELEASE_NAME from previous step
+          npx @sentry/cli releases deploys "${{ env.RELEASE_NAME }}" new -e production
