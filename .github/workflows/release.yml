@@ -5,13 +5,21 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: write
+
 env:
+  SENTRY_HOST: https://walton-vikings.sentry.io
   SENTRY_ORG: walton-vikings
   SENTRY_PROJECT: nodejs-api-backend
+  SENTRY_URL: https://sentry.io
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.sentry-release.outputs.version }}
+      release-name: ${{ steps.sentry-release.outputs.release-name }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
@@ -34,37 +42,49 @@ jobs:
         run: npm run build
 
       - name: 📤 Create Sentry release
+        id: sentry-release
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_URL: ${{ env.SENTRY_URL }}
         run: |
-          # Extract version from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
+          set -euo pipefail  # Bash safety flags
+          
+          # Extract version and create consistent release name (strip 'v' prefix)
+          VERSION="${{ github.ref_name }}"
+          VERSION=${VERSION#v}  # Remove 'v' prefix if present
+          RELEASE="${{ env.SENTRY_PROJECT }}@$VERSION"
+          
+          # Export clean version and release name to GitHub Actions environment for reuse
+          echo "CLEAN_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE" >> $GITHUB_ENV
+          
+          # Also expose as step outputs for cross-job and expression context usage
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release-name=$RELEASE" >> $GITHUB_OUTPUT
           
           # Create release
-          npx @sentry/cli releases new vikings-osm-backend@$VERSION
+          npx @sentry/cli releases new "$RELEASE"
           
           # Set commits for the release
-          npx @sentry/cli releases set-commits vikings-osm-backend@$VERSION --auto
+          npx @sentry/cli releases set-commits "$RELEASE" --auto
           
           # Finalize release
-          npx @sentry/cli releases finalize vikings-osm-backend@$VERSION
+          npx @sentry/cli releases finalize "$RELEASE"
 
       - name: 🐙 Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
             ## 🔄 Backend Release
             
-            Release ${{ github.ref }}
+            Release ${{ github.ref_name }}
             
             ## 🔗 Sentry Release
             
             View detailed error tracking and performance monitoring in Sentry:
-            https://walton-vikings.de.sentry.io/releases/vikings-osm-backend@${GITHUB_REF#refs/tags/v}/
+            ${{ env.SENTRY_HOST }}/organizations/${{ env.SENTRY_ORG }}/releases/${{ steps.sentry-release.outputs.release-name }}/
             
             ## 📊 Issue Resolution
             
@@ -72,8 +92,6 @@ jobs:
             - Check the Sentry release page for automatic issue resolution
             - Backend API improvements and error handling enhancements
             - OAuth flow and rate limiting optimizations
-            
-            🤖 Generated with [Claude Code](https://claude.ai/code)
           draft: false
           prerelease: false
 
@@ -85,6 +103,9 @@ jobs:
       - name: 🚀 Mark deployment in Sentry
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_URL: ${{ env.SENTRY_URL }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          npx @sentry/cli releases deploys vikings-osm-backend@$VERSION new -e production
+          set -euo pipefail  # Bash safety flags
+          
+          # Use job output for consistent release name access
+          npx @sentry/cli releases deploys "${{ needs.release.outputs.release-name }}" new -e production
