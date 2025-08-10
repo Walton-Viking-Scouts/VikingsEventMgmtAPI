@@ -2,8 +2,8 @@
 org=walton-vikings
 project=nodejs-api-backend
 
-[auth]
-token='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'
+# Auth token now provided via SENTRY_AUTH_TOKEN environment variable
+# See GitHub repository secrets for secure token management
 
 # Optional - specify your Sentry URL if using self-hosted
 # url=https://de.sentry.io
