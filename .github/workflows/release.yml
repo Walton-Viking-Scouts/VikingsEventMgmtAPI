@@ -42,8 +42,9 @@ jobs:
         run: |
           set -euo pipefail  # Bash safety flags
           
-          # Extract version and create consistent release name
+          # Extract version and create consistent release name (strip 'v' prefix)
           VERSION="${{ github.ref_name }}"
+          VERSION=${VERSION#v}  # Remove 'v' prefix if present
           RELEASE="${{ env.SENTRY_PROJECT }}@$VERSION"
           
           # Create release
@@ -70,7 +71,7 @@ jobs:
             ## 🔗 Sentry Release
             
             View detailed error tracking and performance monitoring in Sentry:
-            ${{ env.SENTRY_HOST }}/organizations/${{ env.SENTRY_ORG }}/releases/${{ env.SENTRY_PROJECT }}@${{ github.ref_name }}/
+            ${{ env.SENTRY_HOST }}/organizations/${{ env.SENTRY_ORG }}/releases/${{ env.SENTRY_PROJECT }}@${GITHUB_REF_NAME#v}/
             
             ## 📊 Issue Resolution
             
@@ -94,6 +95,7 @@ jobs:
           set -euo pipefail  # Bash safety flags
           
           VERSION="${{ github.ref_name }}"
+          VERSION=${VERSION#v}  # Remove 'v' prefix if present
           RELEASE="${{ env.SENTRY_PROJECT }}@$VERSION"
           
           npx @sentry/cli releases deploys "$RELEASE" new -e production
