@@ -235,17 +235,32 @@ app.use(backendRateLimit); // Apply rate limiting middleware to all routes
 
 // Backend API Documentation endpoints - Clean setup
 const swaggerUi = require('swagger-ui-express');
+/**
+ * Docs: Interactive Swagger UI for backend endpoints.
+ * @tags Docs
+ * @route GET /backend-docs
+ * @returns {text/html} 200 - Rendered Swagger UI
+ */
 app.use('/backend-docs', swaggerUi.serve);
 app.get('/backend-docs', swaggerUi.setup(frontendApiDocs.specs, {
   customSiteTitle: 'Vikings OSM Backend API Documentation',
   explorer: false,
 }));
 
-
-// Serve Backend API OpenAPI spec as JSON
+/**
+ * Docs: Backend OpenAPI spec JSON.
+ * @tags Docs
+ * @route GET /backend-docs.json
+ * @returns {object} 200 - OpenAPI JSON
+ */
 app.get('/backend-docs.json', createJsonSpecEndpoint(frontendApiDocs.specs));
 
-// Keep old endpoint for backward compatibility
+/**
+ * Docs: Legacy OpenAPI spec JSON (backward compatibility).
+ * @tags Docs
+ * @route GET /api-docs.json
+ * @returns {object} 200 - OpenAPI JSON (same as /backend-docs.json)
+ */
 app.get('/api-docs.json', createJsonSpecEndpoint(frontendApiDocs.specs));
 
 // OSM API Documentation endpoints - DISABLED to fix conflicts
@@ -389,7 +404,23 @@ const apiMonitoringMiddleware = (req, res, next) => {
 // Apply API monitoring middleware to all routes
 app.use(apiMonitoringMiddleware);
 
-// Enhanced health endpoint with Sentry metrics
+/**
+ * Health: Basic service and environment status.
+ *
+ * Useful for uptime checks and quick diagnostics. Includes token stats and memory snapshot.
+ *
+ * @tags Health
+ * @route GET /health
+ * @returns {object} 200 - Service status, environment, and lightweight metrics
+ * @example Success response
+ * {
+ *   "status": "healthy",
+ *   "timestamp": "2025-01-09T12:34:56.789Z",
+ *   "uptime": "3600 seconds",
+ *   "environment": "development",
+ *   "tokenStats": { "total": 2, "active": 2, "expired": 0 }
+ * }
+ */
 app.get('/health', (req, res) => {
   const { getTokenStats } = require('./controllers/auth');
   const stats = getTokenStats();
@@ -471,7 +502,14 @@ app.get('/health', (req, res) => {
   res.json(healthData);
 });
 
-// Token management endpoint for debugging (remove in production)
+/**
+ * Admin: Inspect in-memory tokens (disabled in production).
+ *
+ * @tags Admin
+ * @route GET /admin/tokens
+ * @returns {object} 200 - Summary and redacted token list
+ * @returns {object} 403 - When NODE_ENV=production
+ */
 app.get('/admin/tokens', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'Admin endpoints disabled in production' });
@@ -509,7 +547,14 @@ app.get('/admin/tokens', (req, res) => {
   });
 });
 
-// Token cleanup endpoint
+/**
+ * Admin: Remove expired tokens from memory (disabled in production).
+ *
+ * @tags Admin
+ * @route POST /admin/tokens/cleanup
+ * @returns {object} 200 - Cleanup summary
+ * @returns {object} 403 - When NODE_ENV=production
+ */
 app.post('/admin/tokens/cleanup', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'Admin endpoints disabled in production' });
@@ -532,7 +577,14 @@ app.post('/admin/tokens/cleanup', (req, res) => {
   });
 });
 
-// Clear all tokens endpoint
+/**
+ * Admin: Clear all tokens from memory (disabled in production).
+ *
+ * @tags Admin
+ * @route POST /admin/tokens/clear
+ * @returns {object} 200 - Clear summary
+ * @returns {object} 403 - When NODE_ENV=production
+ */
 app.post('/admin/tokens/clear', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'Admin endpoints disabled in production' });
@@ -548,24 +600,121 @@ app.post('/admin/tokens/clear', (req, res) => {
   });
 });
 
-// OSM API proxy endpoints (with rate limiting)
+/**
+ * OSM: Terms proxy.
+ * @tags OSM
+ * @route GET /get-terms
+ */
 app.get('/get-terms', osmController.getTerms); // Updated to GET
+
+/**
+ * OSM: Section configuration proxy.
+ * @tags OSM
+ * @route GET /get-section-config
+ */
 app.get('/get-section-config', osmController.getSectionConfig); // Updated to GET
+
+/**
+ * OSM: User roles proxy.
+ * @tags OSM
+ * @route GET /get-user-roles
+ */
 app.get('/get-user-roles', osmController.getUserRoles); // Updated to GET
+
+/**
+ * OSM: Events proxy.
+ * @tags OSM
+ * @route GET /get-events
+ */
 app.get('/get-events', osmController.getEvents); // Updated to GET
+
+/**
+ * OSM: Event attendance proxy.
+ * @tags OSM
+ * @route GET /get-event-attendance
+ */
 app.get('/get-event-attendance', osmController.getEventAttendance);
+
+/**
+ * OSM: Event summary proxy.
+ * @tags OSM
+ * @route GET /get-event-summary
+ */
 app.get('/get-event-summary', osmController.getEventSummary);
+
+/**
+ * OSM: Contact details proxy.
+ * @tags OSM
+ * @route GET /get-contact-details
+ */
 app.get('/get-contact-details', osmController.getContactDetails);
+
+/**
+ * OSM: Members list proxy.
+ * @tags OSM
+ * @route GET /get-list-of-members
+ */
 app.get('/get-list-of-members', osmController.getListOfMembers);
+
+/**
+ * OSM: Flexi records proxy.
+ * @tags OSM
+ * @route GET /get-flexi-records
+ */
 app.get('/get-flexi-records', osmController.getFlexiRecords);
+
+/**
+ * OSM: Flexi structure proxy.
+ * @tags OSM
+ * @route GET /get-flexi-structure
+ */
 app.get('/get-flexi-structure', osmController.getFlexiStructure);
+
+/**
+ * OSM: Single flexi record proxy.
+ * @tags OSM
+ * @route GET /get-single-flexi-record
+ */
 app.get('/get-single-flexi-record', osmController.getSingleFlexiRecord);
+
+/**
+ * OSM: Update single flexi record.
+ * @tags OSM
+ * @route POST /update-flexi-record
+ */
 app.post('/update-flexi-record', osmController.updateFlexiRecord);
+
+/**
+ * OSM: Bulk update flexi record.
+ * @tags OSM
+ * @route POST /multi-update-flexi-record
+ */
 app.post('/multi-update-flexi-record', osmController.multiUpdateFlexiRecord);
+
+/**
+ * OSM: Startup data proxy.
+ * @tags OSM
+ * @route GET /get-startup-data
+ */
 app.get('/get-startup-data', osmController.getStartupData);
+
+/**
+ * OSM: Members grid (transformed).
+ * @tags OSM
+ * @route POST /get-members-grid
+ */
 app.post('/get-members-grid', osmController.getMembersGrid);
 
-// Sentry test endpoint
+/**
+ * Monitoring: Sentry test helper.
+ *
+ * Use `?type=error|message|exception` to trigger different behaviors.
+ *
+ * @tags Monitoring
+ * @route GET /test-sentry
+ * @param {string} [query.type] - One of: error, message, exception
+ * @returns {object} 200 - Guidance or confirmation
+ */
 app.get('/test-sentry', createTestEndpoint({
   'error': (_req, _res) => {
     throw new Error('Test error for Sentry - this is expected!');
@@ -597,7 +746,55 @@ app.get('/test-sentry', createTestEndpoint({
   },
 }, 'type', 'default'));
 
-// Rate limiting test endpoint for development
+/**
+ * Monitoring: Sentry test helper.
+ *
+ * Use `?type=error|message|exception` to trigger different behaviors.
+ *
+ * @tags Monitoring
+ * @route GET /test-sentry
+ * @param {string} [query.type] - One of: error, message, exception
+ * @returns {object} 200 - Guidance or confirmation
+ */
+app.get('/test-sentry', createTestEndpoint({
+  'error': (_req, _res) => {
+    throw new Error('Test error for Sentry - this is expected!');
+  },
+  'message': (req, res) => {
+    if (Sentry) {
+      Sentry.captureMessage('Test message from backend', 'info');
+    }
+    res.json({ message: 'Test message sent to Sentry' });
+  },
+  'exception': (req, res) => {
+    if (Sentry) {
+      Sentry.captureException(new Error('Test exception for Sentry'));
+    }
+    res.json({ message: 'Test exception sent to Sentry' });
+  },
+  'default': (req, res) => {
+    res.json({ 
+      message: 'Sentry test endpoint',
+      usage: '?type=error|message|exception',
+      sentryEnabled: !!Sentry && !!process.env.SENTRY_DSN,
+      debug: {
+        sentryObject: !!Sentry,
+        dsn: process.env.SENTRY_DSN ? 'Set' : 'Missing',
+        nodeEnv: process.env.NODE_ENV,
+        testEnv: process.env.NODE_ENV === 'test',
+      },
+    });
+  },
+}, 'type', 'default'));
+
+/**
+ * Monitoring: Rate-limit test helper for development.
+ *
+ * @tags Monitoring
+ * @route GET /test-rate-limits
+ * @param {string} [query.type] - backend-stress | osm-simulation
+ * @returns {object} 200 - Guidance or simulation
+ */
 app.get('/test-rate-limits', createTestEndpoint({
   'backend-stress': (req, res) => {
     // This will trigger backend rate limiting after multiple requests
@@ -638,7 +835,13 @@ app.get('/test-rate-limits', createTestEndpoint({
   },
 }));
 
-// Add OAuth environment validation endpoint for debugging
+/**
+ * OAuth: Debug current environment and token storage.
+ *
+ * @tags OAuth
+ * @route GET /oauth/debug
+ * @returns {object} 200 - Environment and token diagnostics
+ */
 app.get('/oauth/debug', (req, res) => {
   const { getTokenStats } = require('./controllers/auth');
   const { getSessionId } = require('./middleware/rateLimiting');
@@ -682,7 +885,15 @@ app.get('/oauth/debug', (req, res) => {
   });
 });
 
-// Frontend URL detection test endpoint
+/**
+ * Utility: Inspect how the frontend URL is detected.
+ *
+ * @tags Utility
+ * @route GET /test-frontend-url
+ * @param {string} [query.state] - dev to simulate dev detection
+ * @param {string} [query.frontend_url] - Explicit override
+ * @returns {object} 200 - Detection details and scenarios
+ */
 app.get('/test-frontend-url', (req, res) => {
   const detectedUrl = getFrontendUrl(req, { enableLogging: true });
   
@@ -847,7 +1058,23 @@ const getUrlDetectionMethod = (req) => {
   return 'Default Fallback (Production)';
 };
 
-// OAuth callback route to handle the authorization code from OSM
+/**
+ * OAuth: Authorization callback handler from OSM.
+ *
+ * Exchanges the code for a token, stores it against the session, then redirects back to the frontend.
+ *
+ * @tags OAuth
+ * @route GET /oauth/callback
+ * @param {string} query.code - Authorization code from OSM
+ * @param {string} [query.state] - State echo from original request
+ * @param {string} [query.error] - Error from OSM if the user denied authorization
+ * @param {string} [query.frontend_url] - Optional, validated redirect target
+ * @returns {void} 302 - Redirect to frontend with optional error query param
+ * @example Redirect on success
+ * 302 Location: https://vikingeventmgmt.onrender.com
+ * @example Redirect on error
+ * 302 Location: https://vikingeventmgmt.onrender.com?error=access_denied
+ */
 app.get('/oauth/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query;

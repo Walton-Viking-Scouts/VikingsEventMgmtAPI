@@ -346,7 +346,35 @@ const authUtils = {
   },
 };
 
-// Get current token endpoint
+/**
+ * Auth: Get current access token for the caller's session.
+ *
+ * Simple helper used by the frontend to retrieve the stored OSM OAuth token.
+ * Looks up the token for the current session and returns expiry info.
+ *
+ * @tags Auth
+ * @route GET /token
+ * @param {Cookie} session_id - Session identifier cookie set during OAuth callback. Used to locate the stored token.
+ * @returns {object} 200 - Token info
+ * @returns {string} 200.access_token - Bearer token to call backend endpoints
+ * @returns {number} 200.expires_at - Unix epoch millis when the token expires
+ * @returns {number} 200.expires_in - Seconds until expiry from now
+ * @returns {object} 401 - When no active session or token has expired
+ * @example Success response
+ * {
+ *   "access_token": "eyJhbGciOi...example...",
+ *   "expires_at": 1736443200000,
+ *   "expires_in": 3540
+ * }
+ * @example Error response (no session)
+ * {
+ *   "error": "No active session"
+ * }
+ * @example Error response (expired)
+ * {
+ *   "error": "Token expired"
+ * }
+ */
 const getCurrentToken = (req, res) => {
   const sessionId = getSessionId(req);
   const tokenData = userTokens.get(sessionId);
@@ -370,7 +398,23 @@ const getCurrentToken = (req, res) => {
   });
 };
 
-// Logout endpoint
+/**
+ * Auth: Log out and clear the current session.
+ *
+ * Removes the stored token (if present) and clears the `session_id` cookie. Safe to call multiple times.
+ *
+ * @tags Auth
+ * @route POST /logout
+ * @param {Cookie} session_id - Session identifier cookie; if missing, the operation is still treated as success.
+ * @returns {object} 200 - Logout status
+ * @returns {boolean} 200.success - Always true when the request is processed
+ * @returns {string} 200.message - Human-readable message
+ * @example Success response
+ * {
+ *   "success": true,
+ *   "message": "Logged out successfully"
+ * }
+ */
 const logout = (req, res) => {
   const sessionId = getSessionId(req);
   const tokenData = userTokens.get(sessionId);
@@ -445,7 +489,25 @@ const getTokenStats = () => {
   };
 };
 
-// Comprehensive token validation middleware using shared utility
+/**
+ * Middleware: Validate Bearer token in Authorization header.
+ *
+ * Validates that `Authorization: Bearer <token>` is present and maps to an active session.
+ * On success, attaches `req.user` with token metadata. On failure, responds 401 with details.
+ *
+ * @tags Auth
+ * @param {Request} req - Express request
+ * @param {Response} res - Express response
+ * @param {Function} next - Express next function
+ * @header Authorization {string} - Bearer token issued after OAuth callback
+ * @returns {void} 200 - Calls next() and sets `req.user`
+ * @returns {object} 401 - When header is missing, malformed, unknown, or expired
+ * @example Error response (missing header)
+ * {
+ *   "error": "Authorization header required",
+ *   "details": "Missing Authorization header with Bearer token"
+ * }
+ */
 const validateTokenFromHeader = (req, res, next) => {
   const validation = authUtils.validateToken(req, 'token-validation-middleware');
   
@@ -469,7 +531,35 @@ const validateTokenFromHeader = (req, res, next) => {
   next();
 };
 
-// Token validation endpoint (cross-domain compatible) using shared utility
+/**
+ * Auth: Validate Bearer token via an endpoint (CORS-friendly).
+ *
+ * Use this endpoint from web clients to validate a token and get expiry info.
+ *
+ * @tags Auth
+ * @route GET /validate-token
+ * @header Authorization {string} - Bearer token to validate
+ * @returns {object} 200 - Validation details
+ * @returns {string} 200.access_token - Echo of the supplied token
+ * @returns {number} 200.expires_at - Expiry timestamp (ms)
+ * @returns {number} 200.expires_in - Seconds until expiry
+ * @returns {string} 200.sessionId - Associated session id (redacted server-side logs only)
+ * @returns {boolean} 200.valid - Always true on success
+ * @returns {object} 401 - When invalid/expired/missing token
+ * @example Success response
+ * {
+ *   "access_token": "eyJhbGciOi...example...",
+ *   "expires_at": 1736443200000,
+ *   "expires_in": 3520,
+ *   "sessionId": "b8f9e3d0-1a2b-4c5d-9ef0-2d6c3a7e",
+ *   "valid": true
+ * }
+ * @example Error response
+ * {
+ *   "error": "Invalid or expired token",
+ *   "details": "Token not found or session expired"
+ * }
+ */
 const validateTokenEndpoint = (req, res) => {
   const validation = authUtils.validateToken(req, 'token-validation-endpoint');
   
