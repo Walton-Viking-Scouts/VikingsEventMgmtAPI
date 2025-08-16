@@ -510,7 +510,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
     ```
 *   **Key Benefits:**
     *   **Performance**: Single API call vs multiple individual updates
-    *   **Rate Limiting**: Reduces API call overhead and rate limit pressure  
+    *   **Rate Limiting**: Reduces API call overhead and rate limit pressure
     *   **Efficiency**: Ideal for bulk camp group assignments and field updates
     *   **Batch Size**: Recommended to keep batches under 50 scouts for optimal performance
 *   **Field Validation:**
