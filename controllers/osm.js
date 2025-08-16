@@ -487,22 +487,31 @@ const getMembersGrid = createOSMApiHandler('getMembersGrid', {
 });
 
 module.exports = {
+  // Utility
   getRateLimitStatus,
+  getStartupData,
+  
+  // Basic Config
   getTerms,
   getSectionConfig,
   getUserRoles,
+  
+  // Events (grouped together)
   getEvents,
   getEventAttendance,
   getEventSummary,
+  getEventSharingStatus,
+  getSharedEventAttendance,
+  
+  // Members and Contacts
   getContactDetails,
   getListOfMembers,
+  getMembersGrid,
+  
+  // FlexiRecords
   getFlexiRecords,
   getFlexiStructure,
   getSingleFlexiRecord,
-  getEventSharingStatus,
-  getSharedEventAttendance,
   updateFlexiRecord,
   multiUpdateFlexiRecord,
-  getStartupData,
-  getMembersGrid,
 };

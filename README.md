@@ -109,6 +109,8 @@ npm run test:ci       # CI mode (no watch, with coverage)
 - `GET /get-user-roles` - Get user roles
 - `GET /get-events` - Get events
 - `GET /get-event-attendance` - Get event attendance
+- `GET /get-event-sharing-status` - Get event sharing status across sections
+- `GET /get-shared-event-attendance` - Get combined attendance for shared events
 - `GET /get-contact-details` - Get contact details
 - `GET /get-list-of-members` - Get list of members
 - `GET /get-flexi-records` - Get flexi records
