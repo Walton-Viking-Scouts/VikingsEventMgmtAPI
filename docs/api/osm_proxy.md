@@ -196,7 +196,117 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 6. Get Contact Details
+## 6. Get Event Sharing Status
+
+*   **Endpoint:** `GET /get-event-sharing-status`
+*   **Description:** Returns which sections an event has been shared with and their acceptance status.
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+*   **Query Parameters:**
+    *   `eventid` (string, required): The ID of the event.
+    *   `sectionid` (string, required): The ID of the requesting section.
+*   **Example Request:**
+    ```bash
+    curl -X GET "https://your-backend-api.com/get-event-sharing-status?eventid=EVENT_ID&sectionid=SECTION_ID" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "sharing_status": [
+            {
+                "sectionid": "11107",
+                "section_name": "1st Walton Beavers",
+                "status": "accepted",
+                "shared_date": "2025-08-15"
+            },
+            {
+                "sectionid": "11108", 
+                "section_name": "1st Walton Cubs",
+                "status": "pending",
+                "shared_date": "2025-08-16"
+            }
+        ],
+        "event_details": {
+            "eventid": "1573792",
+            "name": "Joint Camp Weekend"
+        }
+    }
+    ```
+*   **Potential Error Responses:**
+    *   `400 Bad Request`: If `eventid` or `sectionid` are missing.
+    *   `401 Unauthorized`.
+    *   `429 Too Many Requests`.
+    *   `500 Internal Server Error`.
+    *   `502 Bad Gateway`.
+
+---
+
+## 7. Get Shared Event Attendance
+
+*   **Endpoint:** `GET /get-shared-event-attendance`
+*   **Description:** Returns combined attendance data from all sections participating in a shared event.
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+*   **Query Parameters:**
+    *   `eventid` (string, required): The ID of the shared event.
+    *   `sectionid` (string, required): The ID of the requesting section.
+*   **Example Request:**
+    ```bash
+    curl -X GET "https://your-backend-api.com/get-shared-event-attendance?eventid=EVENT_ID&sectionid=SECTION_ID" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "combined_attendance": [
+            {
+                "memberid": "1601995",
+                "firstname": "John",
+                "lastname": "Doe",
+                "section": "1st Walton Beavers",
+                "sectionid": "11107",
+                "attending": "yes"
+            },
+            {
+                "memberid": "2060746",
+                "firstname": "Jane", 
+                "lastname": "Smith",
+                "section": "1st Walton Cubs",
+                "sectionid": "11108",
+                "attending": "maybe"
+            }
+        ],
+        "summary": {
+            "total_members": 15,
+            "attending": 12,
+            "not_attending": 2,
+            "maybe": 1
+        },
+        "sections": [
+            {
+                "sectionid": "11107",
+                "section_name": "1st Walton Beavers",
+                "member_count": 8
+            },
+            {
+                "sectionid": "11108", 
+                "section_name": "1st Walton Cubs",
+                "member_count": 7
+            }
+        ]
+    }
+    ```
+*   **Potential Error Responses:**
+    *   `400 Bad Request`: If `eventid` or `sectionid` are missing.
+    *   `401 Unauthorized`.
+    *   `429 Too Many Requests`.
+    *   `500 Internal Server Error`.
+    *   `502 Bad Gateway`.
+
+---
+
+## 8. Get Contact Details
 
 *   **Endpoint:** `GET /get-contact-details`
 *   **Description:** Retrieves contact details for a specific member (scout).
@@ -230,7 +340,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 7. Get List of Members
+## 9. Get List of Members
 
 *   **Endpoint:** `GET /get-list-of-members`
 *   **Description:** Retrieves a list of members for a specific section.
@@ -275,7 +385,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 8. Get Flexi-Records
+## 10. Get Flexi-Records
 
 *   **Endpoint:** `GET /get-flexi-records`
 *   **Description:** Retrieves flexi-records (custom data fields/tables) for a section. Can optionally include archived records.
@@ -320,7 +430,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 9. Get Flexi-Record Structure
+## 11. Get Flexi-Record Structure
 
 *   **Endpoint:** `GET /get-flexi-structure`
 *   **Description:** Retrieves the structure (columns and field types) of a specific flexi-record.
@@ -363,7 +473,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 10. Get Single Flexi-Record Data
+## 12. Get Single Flexi-Record Data
 
 *   **Endpoint:** `GET /get-single-flexi-record`
 *   **Description:** Retrieves the data entries for a specific flexi-record within a section and term. This gets the actual values entered for members against the defined flexi-record structure.
@@ -405,7 +515,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 11. Update Flexi-Record
+## 13. Update Flexi-Record
 
 *   **Endpoint:** `POST /update-flexi-record`
 *   **Description:** Updates a specific field (column) for a member within a flexi-record.
@@ -451,7 +561,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 12. Multi-Update Flexi-Record
+## 14. Multi-Update Flexi-Record
 
 *   **Endpoint:** `POST /multi-update-flexi-record`
 *   **Description:** Updates the same flexi-record field for multiple members in a single batch operation. Much more efficient than individual updates for bulk operations like camp group assignments.
@@ -509,36 +619,35 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
     }
     ```
 *   **Key Benefits:**
-      *   **Performance**: Single API call vs multiple individual updates
-  *   **Rate Limiting**: Reduces API call overhead and rate limit pressure  
-  *   **Efficiency**: Ideal for bulk camp group assignments and field updates
-  *   **Batch Size**: Recommended to keep batches under 50 scouts for optimal performance
+    *   **Performance**: Single API call vs multiple individual updates
+    *   **Rate limiting**: Reduces API call overhead and rate limit pressure
+    *   **Efficiency**: Ideal for bulk camp group assignments and field updates
+    *   **Batch size**: Recommended to keep batches under 50 scouts for optimal performance
 *   **Field Validation:**
-      *   `scouts`: Must be a non-empty array of valid scout ID strings
-  *   `column`: Must match format `f_1`, `f_2`, `f_3`, etc.
-  *   `value`: Can be string or number, converted to string for OSM API
-  *   `sectionid`: Must be a valid section ID the user has access to
-  *   `flexirecordid`: Must be a valid FlexiRecord ID for the section
+    *   `scouts`: Must be a non-empty array of valid scout ID strings
+    *   `column`: Must match format `f_1`, `f_2`, `f_3`, etc.
+    *   `value`: Can be string or number, converted to string for OSM API
+    *   `sectionid`: Must be a valid section ID the user has access to
+    *   `flexirecordid`: Must be a valid FlexiRecord ID for the section
 *   **Potential Error Responses:**
-      *   `400 Bad Request`: Missing parameters, invalid field format, or empty scouts array
-  *   `401 Unauthorized`: Missing or invalid access token
-  *   `429 Too Many Requests`: Rate limits exceeded
-  *   `500 Internal Server Error`: Processing error or OSM API failure
-  *   `502 Bad Gateway`: OSM API unavailable or invalid response
+    *   `400 Bad Request`: Missing parameters, invalid field format, or empty scouts array
+    *   `401 Unauthorized`: Missing or invalid access token
+    *   `429 Too Many Requests`: Rate limits exceeded
+    *   `500 Internal Server Error`: Processing error or OSM API failure
+    *   `502 Bad Gateway`: OSM API unavailable or invalid response
 *   **Batch Operation Semantics:**
-  *   **All-or-Nothing**: The operation either succeeds for all scouts or fails completely
-  *   **Partial Failures**: If any scout ID is invalid, the entire batch fails
-  *   **Response Consistency**: Success response includes `updated_count` matching the scouts array length
-  *   **Error Handling**: Field validation occurs before any updates are attempted
+    *   **All-or-Nothing**: The operation either succeeds for all scouts or fails completely
+    *   **Partial Failures**: If any scout ID is invalid, the entire batch fails
+    *   **Response Consistency**: Success response includes `updated_count` matching the scouts array length
+    *   **Error Handling**: Field validation occurs before any updates are attempted
 *   **Response Shape Differences:**
-  *   **Multi-Update**: Returns structured response with `data.success`, `data.updated_count`, and `data.message`
-  *   **Single Update**: Returns simple OSM response shape with `status: "ok"`
-  *   **Rate Limiting**: Both include identical `_rateLimitInfo` structure for monitoring
+    *   **Multi-Update**: Returns structured response with `data.success`, `data.updated_count`, and `data.message`
+    *   **Single Update**: Returns simple OSM response shape with `status: "ok"`
+    *   **Rate Limiting**: Both include identical `_rateLimitInfo` structure for monitoring
 *   **Related Documentation:** See [Multi-Update API Guide](../API_GUIDE_MULTI_UPDATE.md) for comprehensive usage examples and best practices.
 
 ---
-
-## 13. Get Members Grid
+## 15. Get Members Grid
 
 *   **Endpoint:** `POST /get-members-grid`
 *   **Description:** Retrieves member contact information from OSM and transforms the raw data structure into a more usable format with properly labeled contact groups and fields. This endpoint parses the OSM metadata to map numeric column IDs to readable labels and organizes contact information by groups (e.g., Primary Contact 1, Emergency Contact).
@@ -640,10 +749,10 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
     }
     ```
 *   **Key Features:**
-      *   **Data Transformation**: Converts OSM's raw numeric column IDs (e.g., "1_2") to readable labels (e.g., "First Name")
-  *   **Contact Groups**: Organizes contact information by relationship type (Primary Contact 1, Emergency Contact, etc.)
-  *   **Metadata**: Includes comprehensive metadata about the contact group structure for frontend processing
-  *   **Type Information**: Preserves field type information (text, email, telephone) for proper handling
+    *   **Data transformation**: Converts OSM's raw numeric column IDs (e.g., "1_2") to readable labels (e.g., "First Name")
+    *   **Contact groups**: Organizes contact information by relationship type (Primary Contact 1, Emergency Contact, etc.)
+    *   **Metadata**: Includes comprehensive metadata about the contact group structure for frontend processing
+    *   **Type information**: Preserves field type information (text, email, telephone) for proper handling
 *   **Potential Error Responses:**
     *   `400 Bad Request`: If section_id or term_id are missing from the request body.
     *   `401 Unauthorized`: If the access token is missing or invalid.

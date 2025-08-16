@@ -636,6 +636,20 @@ app.get('/get-events', osmController.getEvents); // Updated to GET
 app.get('/get-event-attendance', osmController.getEventAttendance);
 
 /**
+ * OSM: Event sharing status proxy.
+ * @tags OSM
+ * @route GET /get-event-sharing-status
+ */
+app.get('/get-event-sharing-status', osmController.getEventSharingStatus);
+
+/**
+ * OSM: Shared event attendance proxy.
+ * @tags OSM
+ * @route GET /get-shared-event-attendance
+ */
+app.get('/get-shared-event-attendance', osmController.getSharedEventAttendance);
+
+/**
  * OSM: Event summary proxy.
  * @tags OSM
  * @route GET /get-event-summary
