@@ -2,7 +2,7 @@
 
 These API endpoints proxy requests to the Online Scout Manager (OSM) API. They handle CORS and allow the backend to manage aspects like rate limiting and consistent authentication.
 
-**Authentication:** All endpoints listed here require an `Authorization: Bearer <ACCESS_TOKEN>` header, where `<ACCESS_TOKEN>` is the token obtained through the [Authentication Flow](./authentication.md).
+**Authentication:** All endpoints listed here require an `Authorization: Bearer <ACCESS_TOKEN>` header, where `<ACCESS_TOKEN>` is the token obtained through the [Authentication Flow](./auth.md).
 
 **Rate Limiting:** Be mindful of [Rate Limiting](./rate_limiting.md). Responses may include headers related to rate limits.
 
@@ -552,6 +552,9 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
              }'
     ```
 *   **Example Successful Response (`200 OK`):**
+    
+    *Note: Example data shown below uses fictitious names and contact details.*
+    
     ```json
     {
         "status": true,
@@ -559,8 +562,8 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
             "members": [
                 {
                     "member_id": "311708",
-                    "first_name": "Luke",
-                    "last_name": "Hart",
+                    "first_name": "Alex",
+                    "last_name": "Example",
                     "age": "17 / 06",
                     "patrol": "Young Leaders (YLs)",
                     "patrol_id": -3,
@@ -572,18 +575,18 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
                     "section_id": 49097,
                     "contact_groups": {
                         "Primary Contact 1": {
-                            "First Name": "Emma",
-                            "Last Name": "Hart",
-                            "Address 1": "Talisgrove House",
-                            "Email 1": "hart_emma@hotmail.com",
-                            "Phone 1": "07876187138"
+                            "First Name": "Alex",
+                            "Last Name": "Example",
+                            "Address 1": "123 Example Street",
+                            "Email 1": "alex@example.com",
+                            "Phone 1": "07123 456789"
                         },
                         "Primary Contact 2": {
-                            "First Name": "Christopher",
-                            "Last Name": "Pratt",
-                            "Address 1": "Talisgrove House",
-                            "Email 1": "ChristopherP@waltonviking.uk",
-                            "Phone 1": "07747025678"
+                            "First Name": "Sam",
+                            "Last Name": "Sample",
+                            "Address 1": "456 Sample Road",
+                            "Email 1": "sam.sample@example.com",
+                            "Phone 1": "07000 111222"
                         }
                     }
                 }
