@@ -379,6 +379,19 @@ const osmEndpoints = {
     },
   }),
 
+  // Shared events endpoints
+  getEventSharingStatus: () => createSimpleGetHandler(
+    'getEventSharingStatus',
+    'https://www.onlinescoutmanager.co.uk/ext/events/event/sharing/?action=getStatus',
+    ['eventid', 'sectionid'],
+  ),
+
+  getSharedEventAttendance: () => createSimpleGetHandler(
+    'getSharedEventAttendance',
+    'https://www.onlinescoutmanager.co.uk/ext/events/event/sharing/?action=getAttendance',
+    ['eventid', 'sectionid'],
+  ),
+
   // Startup endpoint (with special response processing)
   getStartupData: () => createStartupHandler(
     'getStartupData',

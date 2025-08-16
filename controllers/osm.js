@@ -262,6 +262,38 @@ const getFlexiStructure = osmEndpoints.getFlexiStructure();
 const getSingleFlexiRecord = osmEndpoints.getSingleFlexiRecord();
 
 /**
+ * OSM: Get event sharing status.
+ *
+ * @tags OSM
+ * @route GET /get-event-sharing-status
+ * @header Authorization {string}
+ * @param {string|number} query.eventid - Event id
+ * @param {string|number} query.sectionid - Section id
+ * @returns {object} 200 - Event sharing status
+ * @example Success response
+ * { "shared_sections": [ { "sectionid": "123", "section_name": "1st Example Scouts" } ] }
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: eventid, sectionid" }
+ */
+const getEventSharingStatus = osmEndpoints.getEventSharingStatus();
+
+/**
+ * OSM: Get shared event attendance.
+ *
+ * @tags OSM
+ * @route GET /get-shared-event-attendance
+ * @header Authorization {string}
+ * @param {string|number} query.eventid - Event id
+ * @param {string|number} query.sectionid - Section id
+ * @returns {object} 200 - Combined attendance from all shared sections
+ * @example Success response
+ * { "combined_attendance": [ { "memberid": "555", "firstname": "Alex", "sectionid": "123" } ] }
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: eventid, sectionid" }
+ */
+const getSharedEventAttendance = osmEndpoints.getSharedEventAttendance();
+
+/**
  * OSM: Update a single FlexiRecord field for one member.
  *
  * value can be an empty string to clear a field. `columnid` must match pattern `f_<number>`.
@@ -467,6 +499,8 @@ module.exports = {
   getFlexiRecords,
   getFlexiStructure,
   getSingleFlexiRecord,
+  getEventSharingStatus,
+  getSharedEventAttendance,
   updateFlexiRecord,
   multiUpdateFlexiRecord,
   getStartupData,
