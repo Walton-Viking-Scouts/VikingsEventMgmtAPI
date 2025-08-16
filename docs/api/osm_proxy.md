@@ -509,36 +509,163 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
     }
     ```
 *   **Key Benefits:**
-      *   **Performance**: Single API call vs multiple individual updates
-  *   **Rate Limiting**: Reduces API call overhead and rate limit pressure  
-  *   **Efficiency**: Ideal for bulk camp group assignments and field updates
-  *   **Batch Size**: Recommended to keep batches under 50 scouts for optimal performance
+    *   **Performance**: Single API call vs multiple individual updates
+    *   **Rate Limiting**: Reduces API call overhead and rate limit pressure  
+    *   **Efficiency**: Ideal for bulk camp group assignments and field updates
+    *   **Batch Size**: Recommended to keep batches under 50 scouts for optimal performance
 *   **Field Validation:**
-      *   `scouts`: Must be a non-empty array of valid scout ID strings
-  *   `column`: Must match format `f_1`, `f_2`, `f_3`, etc.
-  *   `value`: Can be string or number, converted to string for OSM API
-  *   `sectionid`: Must be a valid section ID the user has access to
-  *   `flexirecordid`: Must be a valid FlexiRecord ID for the section
+    *   `scouts`: Must be a non-empty array of valid scout ID strings
+    *   `column`: Must match format `f_1`, `f_2`, `f_3`, etc.
+    *   `value`: Can be string or number, converted to string for OSM API
+    *   `sectionid`: Must be a valid section ID the user has access to
+    *   `flexirecordid`: Must be a valid FlexiRecord ID for the section
 *   **Potential Error Responses:**
-      *   `400 Bad Request`: Missing parameters, invalid field format, or empty scouts array
-  *   `401 Unauthorized`: Missing or invalid access token
-  *   `429 Too Many Requests`: Rate limits exceeded
-  *   `500 Internal Server Error`: Processing error or OSM API failure
-  *   `502 Bad Gateway`: OSM API unavailable or invalid response
+    *   `400 Bad Request`: Missing parameters, invalid field format, or empty scouts array
+    *   `401 Unauthorized`: Missing or invalid access token
+    *   `429 Too Many Requests`: Rate limits exceeded
+    *   `500 Internal Server Error`: Processing error or OSM API failure
+    *   `502 Bad Gateway`: OSM API unavailable or invalid response
 *   **Batch Operation Semantics:**
-  *   **All-or-Nothing**: The operation either succeeds for all scouts or fails completely
-  *   **Partial Failures**: If any scout ID is invalid, the entire batch fails
-  *   **Response Consistency**: Success response includes `updated_count` matching the scouts array length
-  *   **Error Handling**: Field validation occurs before any updates are attempted
+    *   **All-or-Nothing**: The operation either succeeds for all scouts or fails completely
+    *   **Partial Failures**: If any scout ID is invalid, the entire batch fails
+    *   **Response Consistency**: Success response includes `updated_count` matching the scouts array length
+    *   **Error Handling**: Field validation occurs before any updates are attempted
 *   **Response Shape Differences:**
-  *   **Multi-Update**: Returns structured response with `data.success`, `data.updated_count`, and `data.message`
-  *   **Single Update**: Returns simple OSM response shape with `status: "ok"`
-  *   **Rate Limiting**: Both include identical `_rateLimitInfo` structure for monitoring
+    *   **Multi-Update**: Returns structured response with `data.success`, `data.updated_count`, and `data.message`
+    *   **Single Update**: Returns simple OSM response shape with `status: "ok"`
+    *   **Rate Limiting**: Both include identical `_rateLimitInfo` structure for monitoring
 *   **Related Documentation:** See [Multi-Update API Guide](../API_GUIDE_MULTI_UPDATE.md) for comprehensive usage examples and best practices.
 
 ---
 
-## 13. Get Members Grid
+## 13. Get Event Sharing Status
+
+*   **Endpoint:** `GET /get-event-sharing-status`
+*   **Description:** Retrieves which sections an event has been shared with through OSM's sharing functionality.
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+*   **Query Parameters:**
+    *   `eventid` (string, required): The ID of the event
+    *   `sectionid` (string, required): The ID of the section that owns the event
+*   **Example Request:**
+    ```bash
+    curl -X GET "https://your-backend-api.com/get-event-sharing-status?eventid=EVENT_ID&sectionid=SECTION_ID" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "status": true,
+        "data": {
+            "shared_sections": [
+                {
+                    "sectionid": "12345",
+                    "section_name": "1st Example Beavers",
+                    "shared_date": "2024-01-15",
+                    "status": "active"
+                },
+                {
+                    "sectionid": "12346", 
+                    "section_name": "1st Example Cubs",
+                    "shared_date": "2024-01-16",
+                    "status": "active"
+                }
+            ],
+            "event_details": {
+                "eventid": "EVENT_ID",
+                "name": "District Camp",
+                "owner_section": "12344"
+            }
+        },
+        "_rateLimitInfo": {
+            // Rate limit information
+        }
+    }
+    ```
+*   **Potential Error Responses:**
+    *   `400 Bad Request`: If `eventid` or `sectionid` are missing
+    *   `401 Unauthorized`: If the access token is missing or invalid
+    *   `429 Too Many Requests`: If rate limits are exceeded
+    *   `500 Internal Server Error`: If there's an error processing the OSM data
+    *   `502 Bad Gateway`: If the OSM API is unavailable or returns invalid data
+
+---
+
+## 14. Get Shared Event Attendance
+
+*   **Endpoint:** `GET /get-shared-event-attendance`
+*   **Description:** Retrieves combined attendance data from all sections participating in a shared event.
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+*   **Query Parameters:**
+    *   `eventid` (string, required): The ID of the shared event
+    *   `sectionid` (string, required): The ID of the section that owns the event
+*   **Example Request:**
+    ```bash
+    curl -X GET "https://your-backend-api.com/get-shared-event-attendance?eventid=EVENT_ID&sectionid=SECTION_ID" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "status": true,
+        "data": {
+            "combined_attendance": [
+                {
+                    "memberid": "MEMBER_ID_1",
+                    "firstname": "John",
+                    "lastname": "Doe", 
+                    "sectionid": "12345",
+                    "section_name": "1st Example Beavers",
+                    "attending": "yes",
+                    "notes": "Dietary requirements: vegetarian"
+                },
+                {
+                    "memberid": "MEMBER_ID_2",
+                    "firstname": "Jane",
+                    "lastname": "Smith",
+                    "sectionid": "12346", 
+                    "section_name": "1st Example Cubs",
+                    "attending": "maybe",
+                    "notes": ""
+                }
+            ],
+            "attendance_summary": {
+                "total_members": 45,
+                "attending_yes": 32,
+                "attending_no": 8,
+                "attending_maybe": 5,
+                "by_section": {
+                    "12345": { "yes": 18, "no": 3, "maybe": 2 },
+                    "12346": { "yes": 14, "no": 5, "maybe": 3 }
+                }
+            },
+            "event_details": {
+                "eventid": "EVENT_ID",
+                "name": "District Camp",
+                "shared_sections": ["12345", "12346"]
+            }
+        },
+        "_rateLimitInfo": {
+            // Rate limit information  
+        }
+    }
+    ```
+*   **Key Features:**
+    *   **Cross-Section Data**: Combines attendance from all participating sections
+    *   **Section Identification**: Each attendee includes their section information
+    *   **Attendance Summary**: Provides totals and breakdowns by section
+    *   **Event Context**: Includes event details and which sections are participating
+*   **Potential Error Responses:**
+    *   `400 Bad Request`: If `eventid` or `sectionid` are missing
+    *   `401 Unauthorized`: If the access token is missing or invalid
+    *   `429 Too Many Requests`: If rate limits are exceeded
+    *   `500 Internal Server Error`: If there's an error processing the OSM data
+    *   `502 Bad Gateway`: If the OSM API is unavailable or returns invalid data
+
+---
+
+## 15. Get Members Grid
 
 *   **Endpoint:** `POST /get-members-grid`
 *   **Description:** Retrieves member contact information from OSM and transforms the raw data structure into a more usable format with properly labeled contact groups and fields. This endpoint parses the OSM metadata to map numeric column IDs to readable labels and organizes contact information by groups (e.g., Primary Contact 1, Emergency Contact).
