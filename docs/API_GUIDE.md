@@ -33,6 +33,7 @@ The API is structured into several main parts:
 
 *   [Authentication](./api/auth.md)
 *   [OSM Proxy Endpoints](./api/osm_proxy.md)
+*   [Multi-Update FlexiRecord API](./API_GUIDE_MULTI_UPDATE.md)
 *   [Rate Limiting](./api/rate_limiting.md)
 *   [Other Endpoints](./api/other_endpoints.md)
 

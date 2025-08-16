@@ -2,7 +2,7 @@
 
 These API endpoints proxy requests to the Online Scout Manager (OSM) API. They handle CORS and allow the backend to manage aspects like rate limiting and consistent authentication.
 
-**Authentication:** All endpoints listed here require an `Authorization: Bearer <ACCESS_TOKEN>` header, where `<ACCESS_TOKEN>` is the token obtained through the [Authentication Flow](./authentication.md).
+**Authentication:** All endpoints listed here require an `Authorization: Bearer <ACCESS_TOKEN>` header, where `<ACCESS_TOKEN>` is the token obtained through the [Authentication Flow](./auth.md).
 
 **Rate Limiting:** Be mindful of [Rate Limiting](./rate_limiting.md). Responses may include headers related to rate limits.
 
@@ -18,7 +18,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-terms" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -50,7 +50,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-section-config?sectionid=SECTION_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -82,7 +82,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-user-roles" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -121,7 +121,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-events?sectionid=SECTION_ID&termid=TERM_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -167,7 +167,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-event-attendance?sectionid=SECTION_ID&termid=TERM_ID&eventid=EVENT_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -208,7 +208,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-contact-details?sectionid=SECTION_ID&scoutid=SCOUT_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -241,7 +241,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-list-of-members?sectionid=SECTION_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -288,11 +288,11 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
     ```bash
     # Get active flexi-records
     curl -X GET "https://your-backend-api.com/get-flexi-records?sectionid=SECTION_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
 
     # Get flexi-records including archived
     curl -X GET "https://your-backend-api.com/get-flexi-records?sectionid=SECTION_ID&archived=true" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -332,7 +332,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-flexi-structure?sectionid=SECTION_ID&flexirecordid=FLEXI_RECORD_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -376,7 +376,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X GET "https://your-backend-api.com/get-single-flexi-record?sectionid=SECTION_ID&termid=TERM_ID&flexirecordid=FLEXI_RECORD_ID" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
     ```
 *   **Example Successful Response (`200 OK`):**
     ```json
@@ -425,7 +425,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X POST "https://your-backend-api.com/update-flexi-record" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>" \
          -H "Content-Type: application/json" \
          -d '{
                "sectionid": "12345",
@@ -451,7 +451,94 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 11. Get Members Grid
+## 12. Multi-Update Flexi-Record
+
+*   **Endpoint:** `POST /multi-update-flexi-record`
+*   **Description:** Updates the same flexi-record field for multiple members in a single batch operation. Much more efficient than individual updates for bulk operations like camp group assignments.
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+    *   `Content-Type: application/json` (Required)
+*   **Request Body:**
+    ```json
+    {
+        "sectionid": "SECTION_ID",
+        "scouts": ["MEMBER_ID_1", "MEMBER_ID_2", "MEMBER_ID_3"], // Array of scout/member IDs
+        "value": "NEW_VALUE", // Value to set for all scouts
+        "column": "COLUMN_ID", // Field column ID (e.g., "f_1", "f_2")
+        "flexirecordid": "FLEXI_RECORD_ID" // FlexiRecord ID (extraid)
+    }
+    ```
+    
+    **Note**: This endpoint uses `sectionid`, `column`, and `flexirecordid` to maintain compatibility with the underlying OSM API contract. Other endpoints may use snake_case (`section_id`, `column_id`) - this inconsistency reflects the varied parameter naming in the legacy OSM API and cannot be changed without breaking frontend compatibility.
+*   **Example Request:**
+    ```bash
+    curl -X POST "https://your-backend-api.com/multi-update-flexi-record" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>" \
+         -H "Content-Type: application/json" \
+         -d '{
+               "sectionid": "49097",
+               "scouts": ["1601995", "2060746", "1809627"],
+               "value": "1",
+               "column": "f_1",
+               "flexirecordid": "72758"
+             }'
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "status": true,
+        "data": {
+            "success": true,
+            "updated_count": 3,
+            "message": "Records updated successfully"
+        },
+        "_rateLimitInfo": {
+            "backend": {
+                "limit": 100,
+                "remaining": 99,
+                "resetTime": 1625097600000,
+                "window": "per minute"
+            },
+            "osm": {
+                "limit": 1000,
+                "remaining": 995,
+                "resetTime": 1625100000000,
+                "window": "per hour"
+            }
+        }
+    }
+    ```
+*   **Key Benefits:**
+      *   **Performance**: Single API call vs multiple individual updates
+  *   **Rate Limiting**: Reduces API call overhead and rate limit pressure  
+  *   **Efficiency**: Ideal for bulk camp group assignments and field updates
+  *   **Batch Size**: Recommended to keep batches under 50 scouts for optimal performance
+*   **Field Validation:**
+      *   `scouts`: Must be a non-empty array of valid scout ID strings
+  *   `column`: Must match format `f_1`, `f_2`, `f_3`, etc.
+  *   `value`: Can be string or number, converted to string for OSM API
+  *   `sectionid`: Must be a valid section ID the user has access to
+  *   `flexirecordid`: Must be a valid FlexiRecord ID for the section
+*   **Potential Error Responses:**
+      *   `400 Bad Request`: Missing parameters, invalid field format, or empty scouts array
+  *   `401 Unauthorized`: Missing or invalid access token
+  *   `429 Too Many Requests`: Rate limits exceeded
+  *   `500 Internal Server Error`: Processing error or OSM API failure
+  *   `502 Bad Gateway`: OSM API unavailable or invalid response
+*   **Batch Operation Semantics:**
+  *   **All-or-Nothing**: The operation either succeeds for all scouts or fails completely
+  *   **Partial Failures**: If any scout ID is invalid, the entire batch fails
+  *   **Response Consistency**: Success response includes `updated_count` matching the scouts array length
+  *   **Error Handling**: Field validation occurs before any updates are attempted
+*   **Response Shape Differences:**
+  *   **Multi-Update**: Returns structured response with `data.success`, `data.updated_count`, and `data.message`
+  *   **Single Update**: Returns simple OSM response shape with `status: "ok"`
+  *   **Rate Limiting**: Both include identical `_rateLimitInfo` structure for monitoring
+*   **Related Documentation:** See [Multi-Update API Guide](../API_GUIDE_MULTI_UPDATE.md) for comprehensive usage examples and best practices.
+
+---
+
+## 13. Get Members Grid
 
 *   **Endpoint:** `POST /get-members-grid`
 *   **Description:** Retrieves member contact information from OSM and transforms the raw data structure into a more usable format with properly labeled contact groups and fields. This endpoint parses the OSM metadata to map numeric column IDs to readable labels and organizes contact information by groups (e.g., Primary Contact 1, Emergency Contact).
@@ -468,7 +555,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Example Request:**
     ```bash
     curl -X POST "https://your-backend-api.com/get-members-grid" \
-         -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>" \
          -H "Content-Type: application/json" \
          -d '{
                "section_id": "49097",
@@ -476,6 +563,9 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
              }'
     ```
 *   **Example Successful Response (`200 OK`):**
+    
+    *Note: Example data shown below uses fictitious names and contact details.*
+    
     ```json
     {
         "status": true,
@@ -483,8 +573,8 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
             "members": [
                 {
                     "member_id": "311708",
-                    "first_name": "Luke",
-                    "last_name": "Hart",
+                    "first_name": "Alex",
+                    "last_name": "Example",
                     "age": "17 / 06",
                     "patrol": "Young Leaders (YLs)",
                     "patrol_id": -3,
@@ -496,18 +586,18 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
                     "section_id": 49097,
                     "contact_groups": {
                         "Primary Contact 1": {
-                            "First Name": "Emma",
-                            "Last Name": "Hart",
-                            "Address 1": "Talisgrove House",
-                            "Email 1": "hart_emma@hotmail.com",
-                            "Phone 1": "07876187138"
+                            "First Name": "Alex",
+                            "Last Name": "Example",
+                            "Address 1": "123 Example Street",
+                            "Email 1": "alex@example.com",
+                            "Phone 1": "07123 456789"
                         },
                         "Primary Contact 2": {
-                            "First Name": "Christopher",
-                            "Last Name": "Pratt",
-                            "Address 1": "Talisgrove House",
-                            "Email 1": "ChristopherP@waltonviking.uk",
-                            "Phone 1": "07747025678"
+                            "First Name": "Sam",
+                            "Last Name": "Sample",
+                            "Address 1": "456 Sample Road",
+                            "Email 1": "sam.sample@example.com",
+                            "Phone 1": "07000 111222"
                         }
                     }
                 }
@@ -550,10 +640,10 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
     }
     ```
 *   **Key Features:**
-    *   **Data Transformation**: Converts OSM's raw numeric column IDs (e.g., "1_2") to readable labels (e.g., "First Name")
-    *   **Contact Groups**: Organizes contact information by relationship type (Primary Contact 1, Emergency Contact, etc.)
-    *   **Metadata**: Includes comprehensive metadata about the contact group structure for frontend processing
-    *   **Type Information**: Preserves field type information (text, email, telephone) for proper handling
+      *   **Data Transformation**: Converts OSM's raw numeric column IDs (e.g., "1_2") to readable labels (e.g., "First Name")
+  *   **Contact Groups**: Organizes contact information by relationship type (Primary Contact 1, Emergency Contact, etc.)
+  *   **Metadata**: Includes comprehensive metadata about the contact group structure for frontend processing
+  *   **Type Information**: Preserves field type information (text, email, telephone) for proper handling
 *   **Potential Error Responses:**
     *   `400 Bad Request`: If section_id or term_id are missing from the request body.
     *   `401 Unauthorized`: If the access token is missing or invalid.

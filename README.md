@@ -116,6 +116,7 @@ npm run test:ci       # CI mode (no watch, with coverage)
 - `GET /get-single-flexi-record` - Get single flexi record
 - `GET /get-startup-data` - Get user startup data
 - `POST /update-flexi-record` - Update flexi record (with enhanced validation)
+- `POST /multi-update-flexi-record` - Batch update same field for multiple members
 
 ## Rate Limiting
 
