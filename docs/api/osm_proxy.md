@@ -451,7 +451,83 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 11. Get Members Grid
+## 12. Multi-Update Flexi-Record
+
+*   **Endpoint:** `POST /multi-update-flexi-record`
+*   **Description:** Updates the same flexi-record field for multiple members in a single batch operation. Much more efficient than individual updates for bulk operations like camp group assignments.
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+    *   `Content-Type: application/json` (Required)
+*   **Request Body:**
+    ```json
+    {
+        "sectionid": "SECTION_ID",
+        "scouts": ["MEMBER_ID_1", "MEMBER_ID_2", "MEMBER_ID_3"], // Array of scout/member IDs
+        "value": "NEW_VALUE", // Value to set for all scouts
+        "column": "COLUMN_ID", // Field column ID (e.g., "f_1", "f_2")
+        "flexirecordid": "FLEXI_RECORD_ID" // FlexiRecord ID (extraid)
+    }
+    ```
+*   **Example Request:**
+    ```bash
+    curl -X POST "https://your-backend-api.com/multi-update-flexi-record" \
+         -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+         -H "Content-Type: application/json" \
+         -d '{
+               "sectionid": "49097",
+               "scouts": ["1601995", "2060746", "1809627"],
+               "value": "1",
+               "column": "f_1",
+               "flexirecordid": "72758"
+             }'
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "status": true,
+        "data": {
+            "success": true,
+            "updated_count": 3,
+            "message": "Records updated successfully"
+        },
+        "_rateLimitInfo": {
+            "backend": {
+                "limit": 100,
+                "remaining": 99,
+                "resetTime": 1625097600000,
+                "window": "per minute"
+            },
+            "osm": {
+                "limit": 1000,
+                "remaining": 995,
+                "resetTime": 1625100000000,
+                "window": "per hour"
+            }
+        }
+    }
+    ```
+*   **Key Benefits:**
+    *   **Performance**: Single API call vs multiple individual updates
+    *   **Rate Limiting**: Reduces API call overhead and rate limit pressure  
+    *   **Efficiency**: Ideal for bulk camp group assignments and field updates
+    *   **Batch Size**: Recommended to keep batches under 50 scouts for optimal performance
+*   **Field Validation:**
+    *   `scouts`: Must be a non-empty array of valid scout ID strings
+    *   `column`: Must match format `f_1`, `f_2`, `f_3`, etc.
+    *   `value`: Can be string or number, converted to string for OSM API
+    *   `sectionid`: Must be a valid section ID the user has access to
+    *   `flexirecordid`: Must be a valid FlexiRecord ID for the section
+*   **Potential Error Responses:**
+    *   `400 Bad Request`: Missing parameters, invalid field format, or empty scouts array
+    *   `401 Unauthorized`: Missing or invalid access token
+    *   `429 Too Many Requests`: Rate limits exceeded
+    *   `500 Internal Server Error`: Processing error or OSM API failure
+    *   `502 Bad Gateway`: OSM API unavailable or invalid response
+*   **Related Documentation:** See [Multi-Update API Guide](../API_GUIDE_MULTI_UPDATE.md) for comprehensive usage examples and best practices.
+
+---
+
+## 13. Get Members Grid
 
 *   **Endpoint:** `POST /get-members-grid`
 *   **Description:** Retrieves member contact information from OSM and transforms the raw data structure into a more usable format with properly labeled contact groups and fields. This endpoint parses the OSM metadata to map numeric column IDs to readable labels and organizes contact information by groups (e.g., Primary Contact 1, Emergency Contact).
