@@ -468,6 +468,8 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
         "flexirecordid": "FLEXI_RECORD_ID" // FlexiRecord ID (extraid)
     }
     ```
+    
+    **Note**: This endpoint uses `sectionid`, `column`, and `flexirecordid` to maintain compatibility with the underlying OSM API contract. Other endpoints may use snake_case (`section_id`, `column_id`) - this inconsistency reflects the varied parameter naming in the legacy OSM API and cannot be changed without breaking frontend compatibility.
 *   **Example Request:**
     ```bash
     curl -X POST "https://your-backend-api.com/multi-update-flexi-record" \
