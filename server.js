@@ -1093,6 +1093,22 @@ app.get('/oauth/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query;
     
+    // Enhanced logging for OAuth callback parameters
+    logger.info('OAuth callback received from OSM', {
+      hasCode: !!code,
+      codeLength: code ? code.length : 0,
+      state: state,
+      error: error,
+      allQueryParams: req.query,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer'),
+      xForwardedFor: req.get('X-Forwarded-For'),
+      remoteAddress: req.connection?.remoteAddress,
+      section: 'oauth-callback-received',
+      endpoint: '/oauth/callback',
+      timestamp: new Date().toISOString(),
+    });
+    
     oAuthCallbackLogger.logCallbackReceived(code, state, error, req);
     
     // Debug the frontend URL determination
@@ -1150,6 +1166,19 @@ app.get('/oauth/callback', async (req, res) => {
       redirect_uri: fullRedirectUri,
     };
     
+    // Enhanced logging for token exchange request
+    logger.info('Preparing OAuth token exchange request to OSM', {
+      grantType: tokenPayload.grant_type,
+      clientId: tokenPayload.client_id,
+      hasClientSecret: !!tokenPayload.client_secret,
+      hasCode: !!tokenPayload.code,
+      codeLength: tokenPayload.code ? tokenPayload.code.length : 0,
+      redirectUri: tokenPayload.redirect_uri,
+      section: 'oauth-token-exchange-request',
+      endpoint: '/oauth/callback',
+      timestamp: new Date().toISOString(),
+    });
+    
     oAuthCallbackLogger.logTokenExchange(tokenPayload);
 
     // Retry logic for token exchange with better timeout handling
@@ -1185,8 +1214,89 @@ app.get('/oauth/callback', async (req, res) => {
       }
     }
 
-    const tokenData = await tokenResponse.json();
+    // Enhanced logging to capture HTML error responses from OSM
+    let tokenData;
+    let rawResponseText;
+    
+    try {
+      // For production: get raw text first to detect HTML vs JSON
+      // For tests: use the original json() method to maintain compatibility
+      if (process.env.NODE_ENV === 'test') {
+        // Test environment - use original approach to maintain compatibility
+        tokenData = await tokenResponse.json();
+        rawResponseText = JSON.stringify(tokenData);
+      } else {
+        // Production - get raw text first to handle HTML error pages
+        rawResponseText = await tokenResponse.text();
+        
+        // Log raw response for debugging
+        logger.info('OAuth token response received from OSM', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          headers: Object.fromEntries(tokenResponse.headers.entries()),
+          contentType: tokenResponse.headers.get('content-type'),
+          responseLength: rawResponseText ? rawResponseText.length : 0,
+          responsePreview: rawResponseText ? rawResponseText.substring(0, 500) : 'No response text',
+          isHTML: rawResponseText ? rawResponseText.trim().startsWith('<') : false,
+          section: 'oauth-token-exchange',
+          endpoint: '/oauth/callback',
+          timestamp: new Date().toISOString(),
+        });
+        
+        if (rawResponseText && rawResponseText.trim().startsWith('<')) {
+          // HTML response - this is the error we're trying to capture
+          logger.error('OSM returned HTML instead of JSON - likely blocking/error page', {
+            status: tokenResponse.status,
+            statusText: tokenResponse.statusText,
+            fullHTMLResponse: rawResponseText,
+            contentType: tokenResponse.headers.get('content-type'),
+            section: 'oauth-html-error',
+            endpoint: '/oauth/callback',
+            timestamp: new Date().toISOString(),
+          });
+          
+          // Create a structured error object for the redirect
+          tokenData = {
+            error: 'html_response_received',
+            error_description: `OSM returned HTML instead of JSON. Status: ${tokenResponse.status}`,
+            html_preview: rawResponseText.substring(0, 1000),
+            response_status: tokenResponse.status
+          };
+        } else {
+          // Try to parse as JSON
+          tokenData = JSON.parse(rawResponseText);
+        }
+      }
+      
+    } catch (parseError) {
+      logger.error('Failed to parse OAuth token response', {
+        parseError: parseError.message,
+        responseStatus: tokenResponse.status,
+        responseText: rawResponseText,
+        section: 'oauth-parse-error',
+        endpoint: '/oauth/callback',
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Create error object for redirect
+      tokenData = {
+        error: 'response_parse_failed',
+        error_description: parseError.message,
+        raw_response: rawResponseText ? rawResponseText.substring(0, 1000) : 'No response text'
+      };
+    }
+    
     oAuthCallbackLogger.logTokenResponse(tokenResponse, tokenData);
+    
+    // Debug logging for token data
+    logger.info('Final token data before redirect', {
+      hasTokenData: !!tokenData,
+      hasAccessToken: !!(tokenData && tokenData.access_token),
+      tokenKeys: tokenData ? Object.keys(tokenData) : [],
+      section: 'oauth-debug',
+      endpoint: '/oauth/callback',
+      timestamp: new Date().toISOString(),
+    });
     
     if (!tokenResponse.ok) {
       console.error('Token exchange failed:', tokenData);
