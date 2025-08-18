@@ -198,7 +198,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ## 6. Get Event Sharing Status
 
-*   **Endpoint:** `GET 11x`
+*   **Endpoint:** `GET /get-event-sharing-status`
 *   **Description:** Returns which sections an event has been shared with and their acceptance status.
 *   **Headers:**
     *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)

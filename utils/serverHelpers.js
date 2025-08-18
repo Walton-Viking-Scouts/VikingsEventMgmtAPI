@@ -226,7 +226,26 @@ const oAuthCallbackLogger = {
   
   logSuccessfulRedirect: (redirectUrl) => {
     console.log('Token exchange successful, redirecting to frontend...');
-    console.log('🎯 Redirecting to:', redirectUrl);
+    
+    // Sanitize the redirect URL to avoid logging sensitive tokens
+    let sanitizedUrl = redirectUrl;
+    try {
+      const url = new URL(redirectUrl);
+      if (url.searchParams.has('access_token')) {
+        const token = url.searchParams.get('access_token');
+        // Replace token with a non-reversible placeholder showing first 8 chars
+        url.searchParams.set('access_token', token.substring(0, 8) + '...[REDACTED]');
+        sanitizedUrl = url.toString();
+      }
+    } catch (error) {
+      // If URL parsing fails, manually replace access_token pattern
+      sanitizedUrl = redirectUrl.replace(
+        /access_token=([^&]+)/g,
+        (match, token) => `access_token=${token.substring(0, 8)}...[REDACTED]`,
+      );
+    }
+    
+    console.log('🎯 Redirecting to:', sanitizedUrl);
   },
 };
 

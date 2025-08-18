@@ -1241,8 +1241,8 @@ app.get('/oauth/callback', async (req, res) => {
         const headersObj = Object.fromEntries(tokenResponse.headers.entries());
         const safeHeaders = Object.fromEntries(
           Object.entries(headersObj).map(([k, v]) =>
-            k.toLowerCase() === 'set-cookie' ? [k, '[REDACTED]'] : [k, v]
-          )
+            k.toLowerCase() === 'set-cookie' ? [k, '[REDACTED]'] : [k, v],
+          ),
         );
         const contentType = tokenResponse.headers.get('content-type') || '';
         const looksHTML = !!rawResponseText && rawResponseText.trim().startsWith('<');
@@ -1330,7 +1330,19 @@ app.get('/oauth/callback', async (req, res) => {
         ? { error: 'missing_access_token', received: Object.keys(tokenData || {}) }
         : tokenData;
       
-      console.error('Token exchange failed:', errorDetails);
+      logger.error('Token exchange failed', {
+        route: '/oauth/callback',
+        level: 'error',
+        errorDetails,
+        tokenStatus: tokenResponse.status,
+        tokenStatusText: tokenResponse.statusText,
+        tokenBody: tokenData,
+        frontendUrl,
+        requestId: req.headers['x-request-id'] || null,
+        section: 'oauth-token-exchange-failure',
+        endpoint: '/oauth/callback',
+        timestamp: new Date().toISOString(),
+      });
       return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(errorDetails))}`);
     }
 
