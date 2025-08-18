@@ -1313,9 +1313,25 @@ app.get('/oauth/callback', async (req, res) => {
     
     oAuthCallbackLogger.logTokenResponse(tokenResponse, tokenData);
     
-    if (!tokenResponse.ok) {
-      console.error('Token exchange failed:', tokenData);
-      return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(tokenData))}`);
+    // Debug logging for token data
+    const hasAccessToken = !!(tokenData && tokenData.access_token);
+    logger.info('Final token data before redirect', {
+      hasTokenData: !!tokenData,
+      hasAccessToken,
+      tokenKeys: tokenData ? Object.keys(tokenData) : [],
+      section: 'oauth-debug',
+      endpoint: '/oauth/callback',
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Validate both response status AND presence of access token
+    if (!tokenResponse.ok || !hasAccessToken) {
+      const errorDetails = !hasAccessToken && tokenResponse.ok
+        ? { error: 'missing_access_token', received: Object.keys(tokenData || {}) }
+        : tokenData;
+      
+      console.error('Token exchange failed:', errorDetails);
+      return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(errorDetails))}`);
     }
 
     // Redirect to frontend with token as URL parameter (original working approach)
