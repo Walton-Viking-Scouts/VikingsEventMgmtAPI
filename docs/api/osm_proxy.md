@@ -306,7 +306,181 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 8. Get Contact Details
+## 8. Get Event Summary
+
+*   **Endpoint:** `GET /get-event-summary`
+*   **Description:** Retrieves a comprehensive summary of a specific event from OSM, including member attendance, payment status, financial transactions, and detailed event metadata.
+*   **Headers:**
+    *   `Authorization: Bearer <ACCESS_TOKEN>` (Required)
+*   **Query Parameters:**
+    *   `eventid` (string|number, required): The OSM event ID to retrieve summary for
+*   **Example Request:**
+    ```bash
+    curl -X GET "https://your-backend-api.com/get-event-summary?eventid=1573792" \
+         -H "Authorization: Bearer <ACCESS_TOKEN>"
+    ```
+*   **Example Successful Response (`200 OK`):**
+    ```json
+    {
+        "status": true,
+        "error": null,
+        "data": {
+            "members": [
+                {
+                    "member_id": 1909406,
+                    "full_name": "Shaun Ward",
+                    "photo_guid": "b98f8ed2-c854-4255-83e3-1d3cb443b9a1",
+                    "patrol_id": -2
+                }
+            ],
+            "reserved": [],
+            "sharing": {
+                "is_owner": true,
+                "counts": {
+                    "-99": 0,
+                    "-3": 0,
+                    "-2": 11,
+                    "0": 24
+                }
+            },
+            "online_payments": {
+                "received": 0,
+                "expected": 0,
+                "number_payments": 0
+            },
+            "transactions": {
+                "income": 0,
+                "expense": 0
+            },
+            "at_home": {
+                "enabled": false,
+                "comments_count": 0,
+                "uploads_count": 0,
+                "activities_count": 0
+            },
+            "risk_assessments": {
+                "event": 0,
+                "activity": 0
+            },
+            "cost": 0
+        },
+        "meta": {
+            "has_attachments": false,
+            "archived": false,
+            "isPastEventAndLocked": false,
+            "isSharedAndParentPortalSettingsLocked": false,
+            "event": {
+                "eventid": 1573792,
+                "name": "JOTI / Group Camp 2025",
+                "type": null,
+                "startdate": "2025-10-17",
+                "enddate": "2025-10-19",
+                "starttime": "16:00:00",
+                "endtime": "18:00:00",
+                "cost": 0,
+                "location": "Walton Firs",
+                "latitude": "51.33822300",
+                "longitude": "-0.42872400",
+                "notes": "",
+                "notepad": "",
+                "publicnotes": "<p></p>",
+                "members": [
+                    {
+                        "eventid": 1573792,
+                        "scoutid": 1909406,
+                        "attending": "Yes",
+                        "payment": "Automatic",
+                        "details": [],
+                        "member": {
+                            "scoutid": 1909406,
+                            "firstname": "Shaun",
+                            "lastname": "Ward",
+                            "photo_guid": "b98f8ed2-c854-4255-83e3-1d3cb443b9a1",
+                            "dob": "1973-02-19",
+                            "started": "2020-08-01",
+                            "created_date": "2020-08-14 11:27:33",
+                            "last_accessed": "2025-08-06 18:22:30"
+                        }
+                    }
+                ]
+            }
+        },
+        "_rateLimitInfo": {
+            "backendRateLimit": {
+                "remaining": 99,
+                "resetTime": 1723834800000
+            },
+            "osmRateLimit": {
+                "remaining": 149,
+                "resetTime": 1723834860000
+            }
+        }
+    }
+    ```
+
+### Response Structure
+
+#### data.members
+Array of attending members with basic information:
+- `member_id`: Unique OSM member identifier  
+- `full_name`: Member's full name
+- `photo_guid`: Photo identifier (null if no photo)
+- `patrol_id`: Patrol/section assignment (-2 = leaders, 0 = main section)
+
+#### data.sharing
+Event sharing and attendance counts:
+- `is_owner`: Whether requesting user owns the event
+- `counts`: Member counts by patrol/section ID
+
+#### data.online_payments
+Payment summary:
+- `received`: Amount received through online payments
+- `expected`: Expected payment amount  
+- `number_payments`: Count of online payments
+
+#### data.transactions
+Financial overview:
+- `income`: Total income for event
+- `expense`: Total expenses for event
+
+#### data.at_home
+At-home activity tracking:
+- `enabled`: Whether at-home activities are enabled
+- `comments_count`: Number of comments posted
+- `uploads_count`: Number of files uploaded
+- `activities_count`: Number of activities completed
+
+#### data.risk_assessments
+Risk assessment counts:
+- `event`: Number of event-level risk assessments
+- `activity`: Number of activity-level risk assessments
+
+#### meta.event
+Complete event details including:
+- Basic info: `eventid`, `name`, `type`, dates, times, location
+- Geographic: `latitude`, `longitude`
+- Content: `notes`, `notepad`, `publicnotes`  
+- Settings: `cost`, `allowchanges`, `allowbooking`, etc.
+- `members`: Detailed member list with attendance status and full member records
+
+*   **Potential Error Responses:**
+    *   `400 Bad Request`: If `eventid` is missing.
+    *   `401 Unauthorized`: If the access token is missing or invalid.
+    *   `404 Not Found`: If the event doesn't exist or user doesn't have access.
+    *   `429 Too Many Requests`: If rate limits are exceeded.
+    *   `500 Internal Server Error`: If there's an issue on the server or with the OSM API.
+    *   `502 Bad Gateway`: If OSM returns an invalid response.
+
+*   **Purpose for Applications:**
+    *   Get comprehensive event overview for dashboard displays
+    *   Check member attendance and payment status  
+    *   Access detailed event metadata for planning purposes
+    *   Monitor financial aspects of events (income/expenses)
+    *   Track at-home activities and risk assessments
+
+---
+
+## 9. Get Contact Details
 
 *   **Endpoint:** `GET /get-contact-details`
 *   **Description:** Retrieves contact details for a specific member (scout).
@@ -340,7 +514,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 9. Get List of Members
+## 10. Get List of Members
 
 *   **Endpoint:** `GET /get-list-of-members`
 *   **Description:** Retrieves a list of members for a specific section.
@@ -385,7 +559,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 10. Get Flexi-Records
+## 11. Get Flexi-Records
 
 *   **Endpoint:** `GET /get-flexi-records`
 *   **Description:** Retrieves flexi-records (custom data fields/tables) for a section. Can optionally include archived records.
@@ -430,7 +604,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 11. Get Flexi-Record Structure
+## 12. Get Flexi-Record Structure
 
 *   **Endpoint:** `GET /get-flexi-structure`
 *   **Description:** Retrieves the structure (columns and field types) of a specific flexi-record.
@@ -473,7 +647,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 12. Get Single Flexi-Record Data
+## 13. Get Single Flexi-Record Data
 
 *   **Endpoint:** `GET /get-single-flexi-record`
 *   **Description:** Retrieves the data entries for a specific flexi-record within a section and term. This gets the actual values entered for members against the defined flexi-record structure.
@@ -515,7 +689,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 13. Update Flexi-Record
+## 14. Update Flexi-Record
 
 *   **Endpoint:** `POST /update-flexi-record`
 *   **Description:** Updates a specific field (column) for a member within a flexi-record.
@@ -561,7 +735,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 
 ---
 
-## 14. Multi-Update Flexi-Record
+## 15. Multi-Update Flexi-Record
 
 *   **Endpoint:** `POST /multi-update-flexi-record`
 *   **Description:** Updates the same flexi-record field for multiple members in a single batch operation. Much more efficient than individual updates for bulk operations like camp group assignments.
@@ -647,7 +821,7 @@ These API endpoints proxy requests to the Online Scout Manager (OSM) API. They h
 *   **Related Documentation:** See [Multi-Update API Guide](../API_GUIDE_MULTI_UPDATE.md) for comprehensive usage examples and best practices.
 
 ---
-## 15. Get Members Grid
+## 16. Get Members Grid
 
 *   **Endpoint:** `POST /get-members-grid`
 *   **Description:** Retrieves member contact information from OSM and transforms the raw data structure into a more usable format with properly labeled contact groups and fields. This endpoint parses the OSM metadata to map numeric column IDs to readable labels and organizes contact information by groups (e.g., Primary Contact 1, Emergency Contact).
