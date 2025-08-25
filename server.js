@@ -30,6 +30,7 @@ const {
   createCorsOriginValidator,
   oAuthCallbackLogger,
 } = require('./utils/serverHelpers');
+const { osmHealthLogger } = require('./utils/osmHealthLogger');
 
 // Successfully loaded documentation
 console.log('✅ Frontend API docs loaded:', frontendApiDocs.specs.info.title, '(' + Object.keys(frontendApiDocs.specs.paths).length + ' endpoints)');
@@ -1330,6 +1331,9 @@ app.get('/oauth/callback', async (req, res) => {
         ? { error: 'missing_access_token', received: Object.keys(tokenData || {}) }
         : tokenData;
       
+      // Use OSM health logger for structured monitoring
+      osmHealthLogger.logTokenExchange(false, tokenData, errorDetails);
+      
       logger.error('Token exchange failed', {
         route: '/oauth/callback',
         level: 'error',
@@ -1345,6 +1349,9 @@ app.get('/oauth/callback', async (req, res) => {
       });
       return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(errorDetails))}`);
     }
+
+    // Log successful token exchange
+    osmHealthLogger.logTokenExchange(true, tokenData);
 
     // Redirect to frontend with token as URL parameter (original working approach)
     // This allows the frontend to store the token in sessionStorage on the correct domain
