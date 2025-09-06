@@ -1,23 +1,35 @@
-# Authentication Guide
+# Authentication API
 
-This API uses OAuth2 to authenticate with Online Scout Manager (OSM). Client applications (like the frontend) need to go through an OAuth2 authorization flow to obtain an access token. This token must then be included in the `Authorization` header for most subsequent API calls.
+This document describes the authentication endpoints and OAuth flow for the Vikings OSM Backend API.
 
-## Main OAuth2 Flow (Recommended)
+## Overview
 
-This flow is initiated by the frontend and involves redirecting the user to OSM for authorization.
+This API uses OAuth 2.0 authorization code flow with Online Scout Manager (OSM) and supports dynamic frontend URL detection for flexible deployment environments. Client applications need to obtain an access token through the OAuth flow and include it in the `Authorization` header for subsequent API calls.
 
-### 1. Initiate Authorization
+## OAuth Flow
 
-The frontend application should redirect the user to the OSM authorization URL. The backend provides a debug endpoint (`GET /oauth/debug`) that can help construct this URL.
+The API uses OAuth 2.0 authorization code flow with OSM (Online Scout Manager) and supports dynamic frontend URL detection for flexible deployment environments.
 
-**OSM Authorization URL Structure:**
-`https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=<YOUR_CLIENT_ID>&redirect_uri=<YOUR_BACKEND_CALLBACK_URL>&scope=<SCOPES>&response_type=code&state=<STATE_STRING>`
+### 1. Authorization Request
 
-*   `client_id`: Your OAuth Client ID for OSM. This is `process.env.OAUTH_CLIENT_ID` on the backend.
-*   `redirect_uri`: The backend's OAuth callback URL (e.g., `https://your-backend-url.com/oauth/callback`). This is `process.env.BACKEND_URL + /oauth/callback`. This **must** exactly match one of the redirect URIs registered with your OSM OAuth application.
-*   `scope`: The required permissions (e.g., `section:member:read section:event:read section:flexirecord:write`). Consult OSM documentation for available scopes. The default scopes used by this application are `section:member:read section:programme:read section:event:read section:flexirecord:write`.
-*   `response_type`: Must be `code`.
-*   `state`: An optional, but **highly recommended**, opaque string that will be passed back to your redirect URI. This is used to prevent CSRF attacks and can also be used to pass application state (e.g., environment information like `dev` or `production` or `development`) from the frontend to the backend callback. The backend uses this to determine the correct frontend URL for the final redirect.
+Direct users to OSM authorization URL:
+
+```
+https://www.onlinescoutmanager.co.uk/oauth/authorize?
+  response_type=code&
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=YOUR_BACKEND_URL/oauth/callback&
+  state=OPTIONAL_STATE&
+  frontend_url=YOUR_FRONTEND_URL
+```
+
+**Parameters:**
+- `response_type`: Always `code`
+- `client_id`: Your OSM OAuth client ID (`process.env.OAUTH_CLIENT_ID`)
+- `redirect_uri`: Your backend callback URL (must match exactly with OSM registration)
+- `state`: Optional state parameter for frontend environment detection
+- `frontend_url`: Optional explicit frontend URL for redirect after auth
+- `scope`: Required permissions (default: `section:member:read section:programme:read section:event:read section:flexirecord:write`)
 
 ### 2. User Authorizes Application
 
