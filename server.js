@@ -901,6 +901,67 @@ app.get('/oauth/debug', (req, res) => {
 });
 
 /**
+ * OAuth: Generate OAuth URL and redirect to OSM authorization.
+ *
+ * @tags OAuth
+ * @route GET /oauth/login
+ * @param {string} [query.state] - Environment state (dev/prod)
+ * @param {string} [query.frontend_url] - Frontend URL for callback redirect
+ * @returns {object} 302 - Redirect to OSM OAuth authorization
+ */
+app.get('/oauth/login', (req, res) => {
+  // Check OAuth configuration
+  if (!process.env.OAUTH_CLIENT_ID || !process.env.OAUTH_CLIENT_SECRET) {
+    logger.error('OAuth login attempted but credentials not configured', {
+      section: 'oauth-login-error',
+      endpoint: '/oauth/login',
+      hasClientId: !!process.env.OAUTH_CLIENT_ID,
+      hasClientSecret: !!process.env.OAUTH_CLIENT_SECRET,
+    });
+    return res.status(500).json({
+      error: 'OAuth not configured',
+      message: 'OAuth credentials are not properly configured on the server',
+    });
+  }
+
+  // Extract state and frontend URL from query parameters
+  const { state, frontend_url } = req.query;
+  
+  // Build the callback redirect URI
+  const backendUrl = process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com';
+  const redirectUri = `${backendUrl}/oauth/callback`;
+  
+  // Build state parameter with frontend URL embedded
+  let stateParam = state || 'default';
+  if (frontend_url) {
+    stateParam += `&frontend_url=${encodeURIComponent(frontend_url)}`;
+  }
+  
+  // OAuth scope
+  const scope = 'section:member:read section:programme:read section:event:read section:flexirecord:write';
+  
+  // Construct the OAuth authorization URL
+  const authUrl = 'https://www.onlinescoutmanager.co.uk/oauth/authorize?' +
+    `client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID)}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+    `state=${encodeURIComponent(stateParam)}&` +
+    `scope=${encodeURIComponent(scope)}&` +
+    'response_type=code';
+
+  logger.info('OAuth login initiated - redirecting to OSM', {
+    section: 'oauth-login',
+    endpoint: '/oauth/login',
+    state: stateParam,
+    redirectUri,
+    frontendUrl: frontend_url,
+    referer: req.get('Referer'),
+  });
+
+  // Redirect to OSM OAuth authorization
+  res.redirect(authUrl);
+});
+
+/**
  * Utility: Inspect how the frontend URL is detected.
  *
  * @tags Utility
