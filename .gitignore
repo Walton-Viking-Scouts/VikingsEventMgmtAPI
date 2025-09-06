@@ -60,3 +60,6 @@ src/
 
 # Real OSM data examples
 osm_examples/
+
+# Task Master files
+.taskmaster/
