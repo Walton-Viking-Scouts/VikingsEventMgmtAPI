@@ -10,32 +10,40 @@ This API uses OAuth 2.0 authorization code flow with Online Scout Manager (OSM) 
 
 ### 1. Authorization Request
 
-Direct users to OSM authorization URL:
+Direct users to the backend authorization endpoint (recommended):
+
+```
+GET ${BACKEND_URL}/oauth/authorize?state=ENCODED_STATE
+```
+
+The backend will construct the OSM authorization URL and redirect the user:
 
 ```
 https://www.onlinescoutmanager.co.uk/oauth/authorize?
   response_type=code&
   client_id=YOUR_CLIENT_ID&
   redirect_uri=YOUR_BACKEND_URL/oauth/callback&
-  state=OPTIONAL_STATE&
-  frontend_url=YOUR_FRONTEND_URL
+  state=ENCODED_STATE
 ```
 
 **Parameters:**
 - `response_type`: Always `code`
 - `client_id`: Your OSM OAuth client ID (`process.env.OAUTH_CLIENT_ID`)
 - `redirect_uri`: Your backend callback URL (must match exactly with OSM registration)
-- `state`: Optional state parameter for frontend environment detection
-- `frontend_url`: Optional explicit frontend URL for redirect after auth
+- `state` (required): CSRF nonce plus an encoded/signed redirect hint for the client
 - `scope`: Required permissions (default: `section:member:read section:programme:read section:event:read section:flexirecord:write`)
+
+**Note**: OSM only echoes back the standard `code` and `state` parameters. Any frontend redirect information must be encoded within the `state` parameter.
 
 ### 2. Authorization Callback
 
 OSM redirects to your callback URL with authorization code:
 
 ```
-YOUR_BACKEND_URL/oauth/callback?code=AUTH_CODE&state=STATE&frontend_url=FRONTEND_URL
+YOUR_BACKEND_URL/oauth/callback?code=AUTH_CODE&state=ENCODED_STATE
 ```
+
+**Note**: Only `code` and `state` are returned by OSM. The frontend URL must be extracted from the encoded `state` parameter.
 
 ### 3. Token Exchange
 
@@ -49,12 +57,13 @@ The backend automatically:
 The backend uses multiple methods to determine the correct frontend URL for redirect:
 
 **Priority Order:**
-1. **Explicit Parameter**: `frontend_url` query parameter
-2. **Embedded in State**: `state=prod&frontend_url=https://pr-123-app.onrender.com`
-3. **Referer Header**: Automatic detection from request origin
-4. **Environment Variable**: `FRONTEND_URL` configuration
-5. **State-Based**: `state=dev` → localhost, `state=prod` → production
-6. **Default Fallback**: Production frontend URL
+1. **Embedded in State**: Frontend URL encoded within the `state` parameter
+2. **Referer Header**: Automatic detection from request origin
+3. **Environment Variable**: `FRONTEND_URL` configuration
+4. **State-Based**: `state=dev` → localhost, `state=prod` → production
+5. **Default Fallback**: Production frontend URL
+
+**State Parameter Encoding**: The `state` parameter should contain a signed/encoded payload with both CSRF protection and frontend redirect information.
 
 ## Endpoints
 
@@ -205,14 +214,17 @@ const checkAuth = async () => {
 const startOAuth = () => {
   const backendUrl = 'https://your-backend.com';
   const frontendUrl = window.location.origin;
-  const state = 'prod'; // or 'dev' for development
   
-  const authUrl = `${backendUrl}/oauth/authorize?` +
-    `response_type=code&` +
-    `client_id=YOUR_CLIENT_ID&` +
-    `redirect_uri=${backendUrl}/oauth/callback&` +
-    `state=${state}&` +
-    `frontend_url=${encodeURIComponent(frontendUrl)}`;
+  // Encode state with CSRF nonce and frontend URL
+  const stateData = {
+    nonce: generateCSRFNonce(),
+    frontendUrl: frontendUrl,
+    timestamp: Date.now()
+  };
+  const encodedState = btoa(JSON.stringify(stateData));
+  
+  // Use backend OAuth endpoint (recommended)
+  const authUrl = `${backendUrl}/oauth/authorize?state=${encodedState}`;
   
   window.location.href = authUrl;
 };
