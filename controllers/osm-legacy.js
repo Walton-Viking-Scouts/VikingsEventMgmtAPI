@@ -17,6 +17,17 @@
  */
 const transformMemberGridData = (rawData) => {
   if (!rawData || !rawData.data || !rawData.meta) {
+    // Import logger and Sentry for structured logging
+    const { logger } = require('../config/sentry');
+    const Sentry = require('../config/sentry');
+    
+    logger.error('Invalid OSM API data structure', logger.fmt({ 
+      endpoint: 'osm-legacy.transformMemberGridData', 
+      hasData: !!rawData?.data, 
+      hasMeta: !!rawData?.meta 
+    }));
+    Sentry.captureMessage('transformMemberGridData: invalid OSM data structure', { level: 'warning' });
+    
     return {
       status: false,
       error: 'Invalid data structure from OSM API',
@@ -64,7 +75,12 @@ const transformMemberGridData = (rawData) => {
   const createFieldName = (groupName, columnLabel) => {
     // Input validation - handle null/undefined inputs
     if (!groupName || !columnLabel) {
-      console.warn('createFieldName: Invalid input', { groupName, columnLabel });
+      const { logger } = require('../config/sentry');
+      logger.warn('createFieldName: invalid input', logger.fmt({ 
+        endpoint: 'osm-legacy.transformMemberGridData', 
+        groupName, 
+        columnLabel 
+      }));
       return null;
     }
     
@@ -82,12 +98,14 @@ const transformMemberGridData = (rawData) => {
     
     // Ensure we don't have empty strings after cleaning
     if (!cleanGroupName || !cleanColumnLabel) {
-      console.warn('createFieldName: Empty result after normalization', { 
+      const { logger } = require('../config/sentry');
+      logger.warn('createFieldName: empty result after normalization', logger.fmt({ 
+        endpoint: 'osm-legacy.transformMemberGridData',
         originalGroup: groupName, 
         originalColumn: columnLabel,
         cleanGroup: cleanGroupName,
         cleanColumn: cleanColumnLabel,
-      });
+      }));
       return null;
     }
     
@@ -102,10 +120,10 @@ const transformMemberGridData = (rawData) => {
   Object.entries(rawData.data).forEach(([memberId, memberData]) => {
     const transformedMember = {
       member_id: memberId,
-      first_name: memberData.first_name || '',
-      last_name: memberData.last_name || '',
-      age: memberData.age || '',
-      patrol: memberData.patrol || '',
+      first_name: memberData.first_name ?? '',
+      last_name: memberData.last_name ?? '',
+      age: memberData.age ?? '',
+      patrol: memberData.patrol ?? '',
       patrol_id: memberData.patrol_id,
       active: memberData.active,
       joined: memberData.joined,
@@ -132,9 +150,9 @@ const transformMemberGridData = (rawData) => {
             // Create flattened field (include empty values for proper "missing" indicators)
             const flatFieldName = createFieldName(groupName, columnLabel);
             if (flatFieldName) {
-              transformedMember[flatFieldName] = value || ''; // Ensure empty values are preserved
+              transformedMember[flatFieldName] = value ?? ''; // Ensure empty values are preserved
             }
-          } else if (value && String(value).trim()) {
+          } else if (String(value ?? '').trim() !== '') {
             // Fallback for unmapped columns - only if they have values
             const fallbackLabel = `Column ${columnId}`;
             const flatFieldName = createFieldName(groupName, fallbackLabel);
@@ -153,7 +171,7 @@ const transformMemberGridData = (rawData) => {
     status: true,
     data: {
       members: transformedMembers,
-      // Metadata removed - no longer needed since fields are flattened onto member objects
+      metadata: { contact_groups: contactGroups }, // Preserve response shape
     },
   };
 };
