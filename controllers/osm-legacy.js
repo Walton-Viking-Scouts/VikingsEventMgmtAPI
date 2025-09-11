@@ -113,43 +113,30 @@ const transformMemberGridData = (rawData) => {
       end_date: memberData.end_date,
       date_of_birth: memberData.date_of_birth,
       section_id: memberData.section_id,
-      // Keep the grouped structure for backward compatibility
-      contact_groups: {},
     };
     
-    // Transform custom_data using column mapping to create flattened fields
+    // Transform custom_data using column mapping to create flattened fields only
     if (memberData.custom_data) {
       Object.entries(memberData.custom_data).forEach(([groupId, groupData]) => {
         const normalizedGroupId = String(groupId);
         const groupInfo = contactGroups.find(g => g.group_id === normalizedGroupId);
         const groupName = groupInfo ? groupInfo.name : `Group ${normalizedGroupId}`;
         
-        // Keep grouped structure for backward compatibility
-        if (!transformedMember.contact_groups[groupName]) {
-          transformedMember.contact_groups[groupName] = {};
-        }
-        
         Object.entries(groupData).forEach(([columnId, value]) => {
           const groupColumnId = `${normalizedGroupId}_${columnId}`;
           const columnInfo = columnMapping[groupColumnId];
           
-          if (columnInfo && value && String(value).trim()) {
+          if (columnInfo) {
             const columnLabel = columnInfo.label;
             
-            // Add to grouped structure (backward compatibility)
-            transformedMember.contact_groups[groupName][columnLabel] = value;
-            
-            // Add as flattened field using group name + column label
+            // Create flattened field (include empty values for proper "missing" indicators)
             const flatFieldName = createFieldName(groupName, columnLabel);
             if (flatFieldName) {
-              transformedMember[flatFieldName] = value;
+              transformedMember[flatFieldName] = value || ''; // Ensure empty values are preserved
             }
           } else if (value && String(value).trim()) {
-            // Fallback for unmapped columns
+            // Fallback for unmapped columns - only if they have values
             const fallbackLabel = `Column ${columnId}`;
-            transformedMember.contact_groups[groupName][fallbackLabel] = value;
-            
-            // Add as flattened field with fallback name
             const flatFieldName = createFieldName(groupName, fallbackLabel);
             if (flatFieldName) {
               transformedMember[flatFieldName] = value;
