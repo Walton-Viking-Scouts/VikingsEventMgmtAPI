@@ -6,6 +6,8 @@
  * business logic that couldn't be easily abstracted into the generic handlers.
  */
 
+const { logger, Sentry } = require('../config/sentry');
+
 /**
  * Helper function to transform member grid data structure
  * 
@@ -17,16 +19,12 @@
  */
 const transformMemberGridData = (rawData) => {
   if (!rawData || !rawData.data || !rawData.meta) {
-    // Import logger and Sentry for structured logging
-    const { logger } = require('../config/sentry');
-    const Sentry = require('../config/sentry');
-    
     logger.error('Invalid OSM API data structure', logger.fmt({ 
       endpoint: 'osm-legacy.transformMemberGridData', 
       hasData: !!rawData?.data, 
       hasMeta: !!rawData?.meta 
     }));
-    Sentry.captureMessage('transformMemberGridData: invalid OSM data structure', { level: 'warning' });
+    Sentry?.captureMessage('transformMemberGridData: invalid OSM data structure', 'warning');
     
     return {
       status: false,
@@ -75,7 +73,6 @@ const transformMemberGridData = (rawData) => {
   const createFieldName = (groupName, columnLabel) => {
     // Input validation - handle null/undefined inputs
     if (!groupName || !columnLabel) {
-      const { logger } = require('../config/sentry');
       logger.warn('createFieldName: invalid input', logger.fmt({ 
         endpoint: 'osm-legacy.transformMemberGridData', 
         groupName, 
@@ -98,7 +95,6 @@ const transformMemberGridData = (rawData) => {
     
     // Ensure we don't have empty strings after cleaning
     if (!cleanGroupName || !cleanColumnLabel) {
-      const { logger } = require('../config/sentry');
       logger.warn('createFieldName: empty result after normalization', logger.fmt({ 
         endpoint: 'osm-legacy.transformMemberGridData',
         originalGroup: groupName, 
