@@ -403,26 +403,139 @@ const multiUpdateFlexiRecord = createOSMApiHandler('multiUpdateFlexiRecord', {
   buildUrl: (req) => `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=multiUpdate&sectionid=${req.body.sectionid}`,
   buildRequestOptions: (req, access_token) => {
     const { scouts, value, column, flexirecordid } = req.body;
-    
+
     // Custom validation for scouts array
     const scoutsValidation = validateArrayParam(scouts, 'scouts');
     if (!scoutsValidation.valid) {
-      throw new Error(scoutsValidation.error);
+      const err = new Error(scoutsValidation.error);
+      err.status = 400;
+      err.code = 'VALIDATION_ERROR';
+      throw err;
     }
-    
+
     // Custom validation for field ID format
     const fieldValidation = validateFieldIdFormat(column);
     if (!fieldValidation.valid) {
-      throw new Error(fieldValidation.error);
+      const err = new Error(fieldValidation.error);
+      err.status = 400;
+      err.code = 'VALIDATION_ERROR';
+      throw err;
     }
-    
+
     const requestBody = new URLSearchParams({
       scouts: JSON.stringify(scouts),
       value,
       col: column, // OSM uses 'col' not 'column'
       extraid: flexirecordid,
     });
-    
+
+    return {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: requestBody,
+    };
+  },
+});
+
+/**
+ * OSM: Create a new FlexiRecord template.
+ *
+ * Creates a new FlexiRecord with specified configuration for when required records don't exist.
+ *
+ * @tags OSM
+ * @route POST /create-flexi-record
+ * @header Authorization {string}
+ * @param {string|number} body.sectionid - Section id
+ * @param {string} body.name - FlexiRecord name
+ * @param {string} [body.dob] - Include date of birth field (1 = yes, 0 = no)
+ * @param {string} [body.age] - Include age field (1 = yes, 0 = no)
+ * @param {string} [body.patrol] - Include patrol field (1 = yes, 0 = no)
+ * @param {string} [body.type] - Record type (default: 'none')
+ * @returns {object} 200 - Creation result
+ * @returns {object} 400 - Validation error
+ * @example Success response
+ * { "success": true, "flexirecordid": 12345, "name": "Event Attendance" }
+ * @example Error response
+ * { "error": "Missing required parameter: name" }
+ */
+const createFlexiRecord = createOSMApiHandler('createFlexiRecord', {
+  method: 'POST',
+  requiredParams: ['sectionid', 'name'],
+  buildUrl: (req) => `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=addRecordSet&sectionid=${req.body.sectionid}`,
+  buildRequestOptions: (req, access_token) => {
+    const { name, dob = '1', age = '1', patrol = '1', type = 'none' } = req.body;
+    const safeTrim = (s) => String(s ?? '').trim();
+    const as01 = (v) => (v === '1' || v === 1 || v === true || String(v).toLowerCase() === 'true') ? '1' : '0';
+
+    const nameTrimmed = safeTrim(name);
+    if (!nameTrimmed) {
+      const err = new Error('name must be a non-empty string');
+      err.status = 400; err.code = 'VALIDATION_ERROR'; throw err;
+    }
+    const dobNorm = as01(dob);
+    const ageNorm = as01(age);
+    const patrolNorm = as01(patrol);
+
+    const requestBody = new URLSearchParams({
+      name: nameTrimmed,
+      dob: dobNorm,
+      age: ageNorm,
+      patrol: patrolNorm,
+      type,
+    });
+
+    return {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: requestBody,
+    };
+  },
+});
+
+/**
+ * OSM: Add a new column/field to an existing FlexiRecord.
+ *
+ * Adds a new field to an existing FlexiRecord for data collection.
+ *
+ * @tags OSM
+ * @route POST /add-flexi-column
+ * @header Authorization {string}
+ * @param {string|number} body.sectionid - Section id
+ * @param {string|number} body.flexirecordid - FlexiRecord id to add column to
+ * @param {string} body.columnName - Name of the new column/field
+ * @returns {object} 200 - Addition result
+ * @returns {object} 400 - Validation error
+ * @example Success response
+ * { "success": true, "columnid": "f_5", "name": "assignedTerm" }
+ * @example Error response
+ * { "error": "Missing required parameter: columnName" }
+ */
+const addFlexiColumn = createOSMApiHandler('addFlexiColumn', {
+  method: 'POST',
+  requiredParams: ['sectionid', 'flexirecordid', 'columnName'],
+  buildUrl: (req) => `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=addColumn&sectionid=${req.body.sectionid}&extraid=${req.body.flexirecordid}`,
+  buildRequestOptions: (req, access_token) => {
+    const { columnName } = req.body;
+    const name = String(columnName ?? '').trim();
+    if (!name) {
+      const err = new Error('columnName must be a non-empty string');
+      err.status = 400; err.code = 'VALIDATION_ERROR'; throw err;
+    }
+    if (name.length > 100) {
+      const err = new Error('columnName must be <= 100 characters');
+      err.status = 400; err.code = 'VALIDATION_ERROR'; throw err;
+    }
+
+    const requestBody = new URLSearchParams({
+      columnName: name,
+    });
+
     return {
       method: 'POST',
       headers: {
@@ -490,28 +603,30 @@ module.exports = {
   // Utility
   getRateLimitStatus,
   getStartupData,
-  
+
   // Basic Config
   getTerms,
   getSectionConfig,
   getUserRoles,
-  
+
   // Events (grouped together)
   getEvents,
   getEventAttendance,
   getEventSummary,
   getEventSharingStatus,
   getSharedEventAttendance,
-  
+
   // Members and Contacts
   getContactDetails,
   getListOfMembers,
   getMembersGrid,
-  
+
   // FlexiRecords
   getFlexiRecords,
   getFlexiStructure,
   getSingleFlexiRecord,
   updateFlexiRecord,
   multiUpdateFlexiRecord,
+  createFlexiRecord,
+  addFlexiColumn,
 };

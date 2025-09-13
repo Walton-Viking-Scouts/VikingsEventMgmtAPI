@@ -249,13 +249,17 @@ const createOSMApiHandler = (endpoint, config) => {
       res.json(responseWithRateInfo);
 
     } catch (err) {
-      endpointLogger.error('Internal server error', {
+      const status = Number.isInteger(err.status) ? err.status : 500;
+      const isClientError = status >= 400 && status < 500;
+      endpointLogger.error(isClientError ? 'Request validation failed' : 'Internal server error', {
         error: err.message,
-        stack: err.stack,
+        stack: isClientError ? undefined : err.stack,
+        code: err.code,
       });
-      res.status(500).json({ 
-        error: 'Internal Server Error', 
+      res.status(status).json({
+        error: isClientError ? 'Bad Request' : 'Internal Server Error',
         details: err.message,
+        code: err.code,
       });
     }
   };

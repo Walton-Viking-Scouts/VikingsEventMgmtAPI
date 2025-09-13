@@ -707,6 +707,20 @@ app.post('/update-flexi-record', osmController.updateFlexiRecord);
 app.post('/multi-update-flexi-record', osmController.multiUpdateFlexiRecord);
 
 /**
+ * OSM: Create new flexi record.
+ * @tags OSM
+ * @route POST /create-flexi-record
+ */
+app.post('/create-flexi-record', osmController.createFlexiRecord);
+
+/**
+ * OSM: Add column to flexi record.
+ * @tags OSM
+ * @route POST /add-flexi-column
+ */
+app.post('/add-flexi-column', osmController.addFlexiColumn);
+
+/**
  * OSM: Startup data proxy.
  * @tags OSM
  * @route GET /get-startup-data
