@@ -407,13 +407,19 @@ const multiUpdateFlexiRecord = createOSMApiHandler('multiUpdateFlexiRecord', {
     // Custom validation for scouts array
     const scoutsValidation = validateArrayParam(scouts, 'scouts');
     if (!scoutsValidation.valid) {
-      throw new Error(scoutsValidation.error);
+      const err = new Error(scoutsValidation.error);
+      err.status = 400;
+      err.code = 'VALIDATION_ERROR';
+      throw err;
     }
 
     // Custom validation for field ID format
     const fieldValidation = validateFieldIdFormat(column);
     if (!fieldValidation.valid) {
-      throw new Error(fieldValidation.error);
+      const err = new Error(fieldValidation.error);
+      err.status = 400;
+      err.code = 'VALIDATION_ERROR';
+      throw err;
     }
 
     const requestBody = new URLSearchParams({
