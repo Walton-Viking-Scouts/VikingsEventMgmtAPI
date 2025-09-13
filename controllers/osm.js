@@ -467,12 +467,23 @@ const createFlexiRecord = createOSMApiHandler('createFlexiRecord', {
   buildUrl: (req) => `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=addRecordSet&sectionid=${req.body.sectionid}`,
   buildRequestOptions: (req, access_token) => {
     const { name, dob = '1', age = '1', patrol = '1', type = 'none' } = req.body;
+    const safeTrim = (s) => String(s ?? '').trim();
+    const as01 = (v) => (v === '1' || v === 1 || v === true || String(v).toLowerCase() === 'true') ? '1' : '0';
+
+    const nameTrimmed = safeTrim(name);
+    if (!nameTrimmed) {
+      const err = new Error('name must be a non-empty string');
+      err.status = 400; err.code = 'VALIDATION_ERROR'; throw err;
+    }
+    const dobNorm = as01(dob);
+    const ageNorm = as01(age);
+    const patrolNorm = as01(patrol);
 
     const requestBody = new URLSearchParams({
-      name,
-      dob,
-      age,
-      patrol,
+      name: nameTrimmed,
+      dob: dobNorm,
+      age: ageNorm,
+      patrol: patrolNorm,
       type,
     });
 
@@ -511,9 +522,18 @@ const addFlexiColumn = createOSMApiHandler('addFlexiColumn', {
   buildUrl: (req) => `https://www.onlinescoutmanager.co.uk/ext/members/flexirecords/?action=addColumn&sectionid=${req.body.sectionid}&extraid=${req.body.flexirecordid}`,
   buildRequestOptions: (req, access_token) => {
     const { columnName } = req.body;
+    const name = String(columnName ?? '').trim();
+    if (!name) {
+      const err = new Error('columnName must be a non-empty string');
+      err.status = 400; err.code = 'VALIDATION_ERROR'; throw err;
+    }
+    if (name.length > 100) {
+      const err = new Error('columnName must be <= 100 characters');
+      err.status = 400; err.code = 'VALIDATION_ERROR'; throw err;
+    }
 
     const requestBody = new URLSearchParams({
-      columnName,
+      columnName: name,
     });
 
     return {
