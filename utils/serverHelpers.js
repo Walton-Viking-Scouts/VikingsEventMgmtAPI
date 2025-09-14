@@ -141,6 +141,8 @@ const logAvailableEndpoints = () => {
   console.log('- GET /get-flexi-structure');
   console.log('- GET /get-single-flexi-record');
   console.log('- POST /update-flexi-record');
+  console.log('- POST /create-flexi-record');
+  console.log('- POST /add-flexi-column');
   console.log('- POST /get-members-grid');
 };
 
