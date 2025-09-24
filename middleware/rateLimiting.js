@@ -17,7 +17,7 @@ const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'test' ? 1000 : 100; //
 
 // Per-second rate limiting to prevent burst requests
 const BACKEND_RATE_LIMIT_SECOND = 1000; // 1 second window
-const MAX_REQUESTS_PER_SECOND = process.env.NODE_ENV === 'test' ? 100 : 5; // 5 req/sec for development and production
+const MAX_REQUESTS_PER_SECOND = process.env.NODE_ENV === 'test' ? 100 : 10; // 10 req/sec for development and production
 
 // Per-hour rate limiting to stay under OSM's 1000/hour limit
 const BACKEND_RATE_LIMIT_HOUR = 3600000; // 1 hour window (60 * 60 * 1000)
