@@ -49,7 +49,20 @@ try {
   Sentry = null;
 }
 
-module.exports = { 
-  Sentry, 
-  logger: Sentry?.logger || null, 
+// No-op fallback so callers can do `logger.info(...)` without null-checks
+// when Sentry is unavailable (test env, missing package, etc.)
+const noopLogger = {
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  fatal: () => {},
+  fmt: (strings, ...values) =>
+    strings.reduce((acc, s, i) => acc + s + (i < values.length ? String(values[i]) : ''), ''),
+};
+
+module.exports = {
+  Sentry,
+  logger: Sentry?.logger || noopLogger,
 };

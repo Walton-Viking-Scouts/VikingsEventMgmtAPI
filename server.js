@@ -1149,23 +1149,87 @@ const getUrlDetectionMethod = (req) => {
 };
 
 /**
+ * Parse the platform suffix from the OAuth state parameter.
+ *
+ * State may contain `&frontend_url=...` appended by /oauth/login, so we
+ * split on `&` first and only inspect the first segment. The first segment
+ * is `${env}:${platform}` (e.g. `prod:ios`, `dev:web`) or just `${env}`
+ * for legacy callers without platform support.
+ *
+ * Returns 'web' for empty/unknown values, with a warn log for any non-empty
+ * suffix that isn't recognised so future platform additions are noticed.
+ *
+ * @param {string|undefined} state
+ * @returns {'ios'|'web'}
+ */
+function parsePlatformFromState(state) {
+  const firstSegment = (typeof state === 'string' ? state : '').split('&')[0];
+  const stateParts = firstSegment.split(':');
+  const raw = (stateParts[1] || '').toLowerCase().trim();
+  if (!raw) return 'web';
+  if (raw === 'ios' || raw === 'web') return raw;
+  (logger?.warn || console.warn)('OAuth callback received with unrecognised platform suffix', {
+    rawPlatform: raw,
+    firstSegment,
+    state: typeof state === 'string' ? state.slice(0, 200) : null,
+    section: 'oauth-callback-unknown-platform',
+    endpoint: '/oauth/callback',
+  });
+  return 'web';
+}
+
+/**
+ * Build a platform-aware redirect URL.
+ *
+ * iOS clients receive `vikings://oauth-callback?...` so the Capacitor
+ * native app can intercept via the registered URL scheme. All other
+ * platforms get the standard HTTPS redirect to the frontend.
+ *
+ * @param {string} frontendUrl
+ * @param {boolean} isIOS
+ * @param {Record<string, string|number|undefined|null>} params
+ * @returns {string}
+ */
+function buildRedirectUrl(frontendUrl, isIOS, params) {
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null) continue;
+    search.set(k, typeof v === 'string' ? v : JSON.stringify(v));
+  }
+  if (isIOS) {
+    return `vikings://oauth-callback?${search.toString()}`;
+  }
+  return `${frontendUrl}/?${search.toString()}`;
+}
+
+/**
  * OAuth: Authorization callback handler from OSM.
  *
  * Exchanges the code for a token, stores it against the session, then redirects back to the frontend.
+ * iOS clients (state suffix `:ios`) receive `vikings://oauth-callback?...` instead of the HTTPS frontend
+ * URL so the Capacitor native app can intercept via the registered URL scheme.
  *
  * @tags OAuth
  * @route GET /oauth/callback
  * @param {string} query.code - Authorization code from OSM
- * @param {string} [query.state] - State echo from original request
+ * @param {string} [query.state] - State echo from original request, format `${env}:${platform}` (e.g. `prod:ios`)
  * @param {string} [query.error] - Error from OSM if the user denied authorization
- * @param {string} [query.frontend_url] - Optional, validated redirect target
- * @returns {void} 302 - Redirect to frontend with optional error query param
- * @example Redirect on success
- * 302 Location: https://vikingeventmgmt.onrender.com
- * @example Redirect on error
+ * @param {string} [query.frontend_url] - Optional, validated redirect target (web only)
+ * @returns {void} 302 - Redirect to frontend (web) or vikings:// (iOS) with optional error query param
+ * @example Web success
+ * 302 Location: https://vikingeventmgmt.onrender.com/?access_token=...
+ * @example iOS success
+ * 302 Location: vikings://oauth-callback?access_token=...
+ * @example Web error
  * 302 Location: https://vikingeventmgmt.onrender.com?error=access_denied
+ * @example iOS error
+ * 302 Location: vikings://oauth-callback?error=access_denied
  */
 app.get('/oauth/callback', async (req, res) => {
+  const platform = parsePlatformFromState(req.query.state);
+  const isIOS = platform === 'ios';
+  const frontendUrl = getFrontendUrl(req, {enableLogging: true});
+
   try {
     const { code, state, error } = req.query;
     
@@ -1194,20 +1258,25 @@ app.get('/oauth/callback', async (req, res) => {
     });
     
     oAuthCallbackLogger.logCallbackReceived(code, state, error, req);
-    
-    // Debug the frontend URL determination
-    const frontendUrl = getFrontendUrl(req, {enableLogging: true});
     oAuthCallbackLogger.logFrontendUrlDetermination(frontendUrl);
-    
-    
+
     if (error) {
-      console.error('OAuth error from OSM:', error);
-      return res.redirect(`${frontendUrl}?error=${error}`);
+      (logger?.error || console.error)('OAuth error returned from OSM', {
+        oauthError: error,
+        platform,
+        section: 'oauth-callback-osm-error',
+        endpoint: '/oauth/callback',
+      });
+      return res.redirect(buildRedirectUrl(frontendUrl, isIOS, { error }));
     }
-    
+
     if (!code) {
-      console.error('No authorization code received');
-      return res.redirect(`${frontendUrl}?error=no_code`);
+      (logger?.error || console.error)('No authorization code received from OSM', {
+        platform,
+        section: 'oauth-callback-no-code',
+        endpoint: '/oauth/callback',
+      });
+      return res.redirect(buildRedirectUrl(frontendUrl, isIOS, { error: 'no_code' }));
     }
 
     // Exchange authorization code for access token
@@ -1422,41 +1491,59 @@ app.get('/oauth/callback', async (req, res) => {
         endpoint: '/oauth/callback',
         timestamp: new Date().toISOString(),
       });
-      return res.redirect(`${frontendUrl}?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(errorDetails))}`);
+      return res.redirect(buildRedirectUrl(frontendUrl, isIOS, {
+        error: 'token_exchange_failed',
+        details: errorDetails,
+      }));
     }
 
     // Log successful token exchange
     osmHealthLogger.logTokenExchange(true, tokenData);
 
-    const stateParts = (typeof state === 'string' ? state : '').split(':');
-    const platform = (stateParts[1] || 'web').toLowerCase();
-    const isIOS = platform === 'ios';
-
-    let redirectUrl;
-    if (isIOS) {
-      const iosParams = new URLSearchParams({
-        access_token: tokenData.access_token,
-        token_type: tokenData.token_type || 'Bearer',
-      });
-      if (tokenData.expires_in !== undefined && tokenData.expires_in !== null) {
-        iosParams.set('expires_in', String(tokenData.expires_in));
-      }
-      redirectUrl = `vikings://oauth-callback?${iosParams.toString()}`;
-      logger.info('Redirecting iOS client to custom URL scheme', {
+    if (!tokenData.access_token) {
+      (logger?.error || console.error)('Missing access_token at redirect-build (defensive guard)', {
         platform,
+        tokenKeys: Object.keys(tokenData || {}),
+        section: 'oauth-callback-missing-token-defensive',
+        endpoint: '/oauth/callback',
+      });
+      return res.redirect(buildRedirectUrl(frontendUrl, isIOS, {
+        error: 'missing_access_token',
+      }));
+    }
+
+    const redirectUrl = buildRedirectUrl(frontendUrl, isIOS, {
+      access_token: tokenData.access_token,
+      token_type: tokenData.token_type || 'Bearer',
+      expires_in: tokenData.expires_in !== undefined && tokenData.expires_in !== null
+        ? String(tokenData.expires_in)
+        : undefined,
+    });
+
+    if (isIOS) {
+      (logger?.info || console.info)('Redirecting iOS client to custom URL scheme', {
+        platform,
+        rawState: typeof state === 'string' ? state.slice(0, 200) : null,
+        hasExpiresIn: tokenData.expires_in !== undefined && tokenData.expires_in !== null,
         section: 'oauth-callback-ios-deeplink',
         endpoint: '/oauth/callback',
-        timestamp: new Date().toISOString(),
       });
-    } else {
-      redirectUrl = `${frontendUrl}/?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`;
     }
     oAuthCallbackLogger.logSuccessfulRedirect(redirectUrl);
     res.redirect(redirectUrl);
-    
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    res.redirect(`${getFrontendUrl(req)}?error=callback_error&details=${encodeURIComponent(error.message)}`);
+
+  } catch (caughtError) {
+    (logger?.error || console.error)('OAuth callback unhandled error', {
+      error: caughtError.message,
+      stack: caughtError.stack,
+      platform,
+      section: 'oauth-callback-unhandled',
+      endpoint: '/oauth/callback',
+    });
+    res.redirect(buildRedirectUrl(frontendUrl, isIOS, {
+      error: 'callback_error',
+      details: caughtError.message,
+    }));
   }
 });
 
