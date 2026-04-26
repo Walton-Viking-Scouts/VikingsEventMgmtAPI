@@ -547,10 +547,34 @@ describe('OAuth Callback Advanced Testing', () => {
         code: 'test-code',
         state: 'retry-test',
       });
-      
+
     expect(response.status).toBe(302);
     expect(response.headers.location).toContain('access_token=retry-success-token');
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('redirects iOS clients to vikings:// custom scheme when state has :ios suffix', async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        access_token: 'ios-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      }),
+    });
+
+    const response = await request(app)
+      .get('/oauth/callback')
+      .query({
+        code: 'test-code',
+        state: 'prod:ios',
+      });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toMatch(/^vikings:\/\/oauth-callback\?/);
+    expect(response.headers.location).toContain('access_token=ios-token');
+    expect(response.headers.location).toContain('token_type=Bearer');
+    expect(response.headers.location).toContain('expires_in=3600');
   });
 });
 
