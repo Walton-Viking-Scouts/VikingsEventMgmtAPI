@@ -1428,9 +1428,29 @@ app.get('/oauth/callback', async (req, res) => {
     // Log successful token exchange
     osmHealthLogger.logTokenExchange(true, tokenData);
 
-    // Redirect to frontend with token as URL parameter (original working approach)
-    // This allows the frontend to store the token in sessionStorage on the correct domain
-    const redirectUrl = `${frontendUrl}/?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`;
+    const stateParts = (typeof state === 'string' ? state : '').split(':');
+    const platform = (stateParts[1] || 'web').toLowerCase();
+    const isIOS = platform === 'ios';
+
+    let redirectUrl;
+    if (isIOS) {
+      const iosParams = new URLSearchParams({
+        access_token: tokenData.access_token,
+        token_type: tokenData.token_type || 'Bearer',
+      });
+      if (tokenData.expires_in !== undefined && tokenData.expires_in !== null) {
+        iosParams.set('expires_in', String(tokenData.expires_in));
+      }
+      redirectUrl = `vikings://oauth-callback?${iosParams.toString()}`;
+      logger.info('Redirecting iOS client to custom URL scheme', {
+        platform,
+        section: 'oauth-callback-ios-deeplink',
+        endpoint: '/oauth/callback',
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      redirectUrl = `${frontendUrl}/?access_token=${tokenData.access_token}&token_type=${tokenData.token_type || 'Bearer'}`;
+    }
     oAuthCallbackLogger.logSuccessfulRedirect(redirectUrl);
     res.redirect(redirectUrl);
     
