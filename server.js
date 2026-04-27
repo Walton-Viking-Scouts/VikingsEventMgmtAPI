@@ -207,7 +207,7 @@ if (Sentry && process.env.SENTRY_DSN && process.env.NODE_ENV !== 'test') {
   console.log('⚠️ Sentry request handlers NOT added - Sentry:', !!Sentry, 'DSN:', !!process.env.SENTRY_DSN, 'ENV:', process.env.NODE_ENV);
 }
 
-// Dynamic CORS configuration to allow production, localhost, and specific PR previews
+// Dynamic CORS configuration to allow production, localhost, PR previews, and Capacitor mobile WebViews
 const allowedOrigins = [
   'https://vikings-eventmgmt.onrender.com',  // Production frontend (vanilla)
   'https://vikingeventmgmt.onrender.com',    // Production frontend (React mobile)
@@ -215,6 +215,8 @@ const allowedOrigins = [
   'http://localhost:3000',                   // Development frontend (vanilla - http)
   'https://localhost:3001',                  // Development frontend (React mobile)
   'http://localhost:3001',                   // Development frontend (React mobile - http)
+  'capacitor://localhost',                   // Capacitor iOS WebView
+  'https://localhost',                       // Capacitor Android WebView (default scheme)
 ];
 const prPreviewPattern = /^https:\/\/vikingeventmgmt-pr-\d+\.onrender\.com$/;
 
