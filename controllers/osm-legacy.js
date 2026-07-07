@@ -127,6 +127,8 @@ const transformMemberGridData = (rawData) => {
       end_date: memberData.end_date,
       date_of_birth: memberData.date_of_birth,
       section_id: memberData.section_id,
+      photo_guid: memberData.photo_guid ?? null,
+      pic: memberData.pic ?? false,
     };
     
     // Transform custom_data using column mapping to create flattened fields only
