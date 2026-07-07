@@ -5,7 +5,7 @@ const {
   getOSMRateLimitInfo, 
   addRateLimitInfoToResponse,
 } = require('../middleware/rateLimiting');
-const { logger: _logger } = require('../config/sentry');
+const { logger } = require('../config/sentry');
 
 /**
  * Creates a simple OSM GET endpoint handler
@@ -125,20 +125,18 @@ const createContactHandler = (endpoint, baseUrl, requiredParams = []) => {
 };
 
 /**
- * Creates startup data endpoint handler (with special response processing)
- * @param {string} endpoint - Endpoint name for logging
- * @param {string} baseUrl - Base OSM API URL
- * @returns {Function} Express request handler
- */
-/**
  * Builds a startup-data-shaped payload from OSM's OAuth resource-owner
  * endpoint. OSM retired /ext/generic/startup/ (it now returns 410 Gone),
  * but the frontend only consumes globals.{firstname,lastname,userid,email},
  * all of which the supported oauth/resource endpoint provides.
  *
+ * Every failure path logs and returns a structured result so the caller can
+ * propagate a truthful status - the fallback must never fail invisibly.
+ *
  * @param {string} accessToken - OSM OAuth access token
  * @param {string} sessionId - Session id for rate-limit tracking
- * @returns {Promise<object|null>} Startup-shaped payload or null on failure
+ * @returns {Promise<{data: object}|{failureStatus: number, reason: string}>}
+ *   Startup-shaped payload, or the fallback's own failure status and reason
  */
 const buildStartupDataFromOAuthResource = async (accessToken, sessionId) => {
   const response = await makeOSMRequest('https://www.onlinescoutmanager.co.uk/oauth/resource', {
@@ -149,30 +147,63 @@ const buildStartupDataFromOAuthResource = async (accessToken, sessionId) => {
   }, sessionId);
 
   if (!response.ok) {
-    return null;
+    logger.warn('Startup fallback: oauth/resource returned non-ok', {
+      status: response.status,
+      sessionId,
+      section: 'startup-fallback',
+    });
+    return { failureStatus: response.status, reason: `oauth/resource returned ${response.status}` };
   }
 
-  const payload = await response.json();
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (parseError) {
+    logger.error('Startup fallback: oauth/resource returned non-JSON body', {
+      error: parseError.message,
+      sessionId,
+      section: 'startup-fallback',
+    });
+    return { failureStatus: 502, reason: 'oauth/resource returned a non-JSON body' };
+  }
+
   const user = payload?.data;
-  if (!user || !user.full_name) {
-    return null;
+  const fullName = typeof user?.full_name === 'string' ? user.full_name.trim() : '';
+  if (!fullName) {
+    logger.error('Startup fallback: oauth/resource payload missing full_name', {
+      hasData: !!user,
+      sessionId,
+      section: 'startup-fallback',
+    });
+    return { failureStatus: 502, reason: 'oauth/resource payload missing user data' };
   }
 
-  const nameParts = String(user.full_name).trim().split(/\s+/);
+  const nameParts = fullName.split(/\s+/);
   const firstname = nameParts[0] || '';
   const lastname = nameParts.slice(1).join(' ');
 
   return {
-    globals: {
-      firstname,
-      lastname,
-      userid: user.user_id ?? null,
-      email: user.email ?? null,
+    data: {
+      globals: {
+        firstname,
+        lastname,
+        userid: user.user_id ?? null,
+        email: user.email ?? null,
+      },
+      _source: 'oauth-resource',
     },
-    _source: 'oauth-resource',
   };
 };
 
+/**
+ * Creates startup data endpoint handler (with special response processing).
+ * When OSM's startup endpoint returns 410 Gone (retired), falls back to the
+ * OAuth resource-owner endpoint via buildStartupDataFromOAuthResource.
+ *
+ * @param {string} endpoint - Endpoint name for logging
+ * @param {string} baseUrl - Base OSM API URL
+ * @returns {Function} Express request handler
+ */
 const createStartupHandler = (endpoint, baseUrl) => {
   // Special handler for startup endpoint that needs custom response processing
   return async (req, res) => {
@@ -200,12 +231,43 @@ const createStartupHandler = (endpoint, baseUrl) => {
         });
       }
 
-      if (!response.ok) {
-        const fallback = await buildStartupDataFromOAuthResource(access_token, sessionId).catch(() => null);
-        if (fallback) {
-          const responseWithRateInfo = addRateLimitInfoToResponse(req, res, fallback);
+      if (response.status === 410) {
+        let fallback;
+        try {
+          fallback = await buildStartupDataFromOAuthResource(access_token, sessionId);
+        } catch (fallbackErr) {
+          logger.error('Startup fallback threw', {
+            error: fallbackErr.message,
+            sessionId,
+            section: 'startup-fallback',
+          });
+          fallback = { failureStatus: 502, reason: `oauth/resource request failed: ${fallbackErr.message}` };
+        }
+
+        if (fallback.data) {
+          logger.info('Startup data served from oauth/resource fallback', {
+            sessionId,
+            section: 'startup-fallback',
+          });
+          const responseWithRateInfo = addRateLimitInfoToResponse(req, res, fallback.data);
           return res.json(responseWithRateInfo);
         }
+
+        if (fallback.failureStatus === 429) {
+          const osmInfo = getOSMRateLimitInfo(sessionId);
+          return res.status(429).json({
+            error: 'OSM API rate limit exceeded',
+            rateLimitInfo: osmInfo,
+            message: 'Please wait before making more requests',
+          });
+        }
+
+        return res.status(502).json({
+          error: `OSM startup endpoint returned 410 and the oauth/resource fallback failed (${fallback.reason})`,
+        });
+      }
+
+      if (!response.ok) {
         return res.status(response.status).json({ error: `OSM API error: ${response.status}` });
       }
 
