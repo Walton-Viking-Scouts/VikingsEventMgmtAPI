@@ -22,7 +22,7 @@ const transformMemberGridData = (rawData) => {
     logger.error('Invalid OSM API data structure', logger.fmt({ 
       endpoint: 'osm-legacy.transformMemberGridData', 
       hasData: !!rawData?.data, 
-      hasMeta: !!rawData?.meta 
+      hasMeta: !!rawData?.meta, 
     }));
     Sentry?.captureMessage('transformMemberGridData: invalid OSM data structure', 'warning');
     
@@ -76,7 +76,7 @@ const transformMemberGridData = (rawData) => {
       logger.warn('createFieldName: invalid input', logger.fmt({ 
         endpoint: 'osm-legacy.transformMemberGridData', 
         groupName, 
-        columnLabel 
+        columnLabel, 
       }));
       return null;
     }
