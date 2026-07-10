@@ -410,6 +410,12 @@ const osmEndpoints = {
     'https://www.onlinescoutmanager.co.uk/ext/events/event/?action=getAttendance',
     ['sectionid', 'termid', 'eventid'],
   ),
+
+  getProgrammeSummary: () => createSimpleGetHandler(
+    'getProgrammeSummary',
+    'https://www.onlinescoutmanager.co.uk/ext/programme/?action=getProgrammeSummary&verbose=1',
+    ['sectionid', 'termid'],
+  ),
   
   // Contact-related endpoints (with special handling)
   getContactDetails: () => createContactHandler(
