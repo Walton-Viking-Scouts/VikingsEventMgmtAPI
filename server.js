@@ -639,6 +639,13 @@ app.get('/get-events', osmController.getEvents); // Updated to GET
 app.get('/get-event-attendance', osmController.getEventAttendance);
 
 /**
+ * OSM: Programme summary proxy (meeting list for a section/term).
+ * @tags OSM
+ * @route GET /get-programme-summary
+ */
+app.get('/get-programme-summary', osmController.getProgrammeSummary);
+
+/**
  * OSM: Event sharing status proxy.
  * @tags OSM
  * @route GET /get-event-sharing-status

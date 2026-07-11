@@ -164,6 +164,26 @@ const getEvents = osmEndpoints.getEvents();
 const getEventAttendance = osmEndpoints.getEventAttendance();
 
 /**
+ * OSM: Get the programme summary (meeting list) for a section and term.
+ *
+ * Proxies the OSM API `action=getProgrammeSummary` with `verbose=1`. Used by
+ * the frontend water-rota feature to derive session dates from each
+ * section's programme.
+ *
+ * @tags OSM
+ * @route GET /get-programme-summary
+ * @header Authorization {string}
+ * @param {string|number} query.sectionid - Section id
+ * @param {string|number} query.termid - Term id
+ * @returns {object} 200 - Programme meetings for the term
+ * @example Success response
+ * { "items": [ { "eveningid": "8785585", "title": "Water night", "meetingdate": "2026-06-02" } ] }
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: sectionid, termid" }
+ */
+const getProgrammeSummary = osmEndpoints.getProgrammeSummary();
+
+/**
  * OSM: Get detailed event summary.
  *
  * @tags OSM
@@ -615,6 +635,9 @@ module.exports = {
   getEventSummary,
   getEventSharingStatus,
   getSharedEventAttendance,
+
+  // Programme
+  getProgrammeSummary,
 
   // Members and Contacts
   getContactDetails,

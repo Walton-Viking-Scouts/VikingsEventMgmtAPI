@@ -122,6 +122,25 @@ describe('Vikings OSM Backend API', () => {
       expect(response2.body.error).toContain('sectionid');
     });
 
+    test('GET /get-programme-summary should require access token, sectionid, and termid', async () => {
+      const response1 = await request(app)
+        .get('/get-programme-summary')
+        .query({})
+        .expect(401);
+
+      expect(response1.body).toHaveProperty('error');
+      expect(response1.body.error).toContain('Access token is required');
+
+      const response2 = await request(app)
+        .get('/get-programme-summary')
+        .set('Authorization', 'Bearer test_token')
+        .query({ sectionid: '49097' })
+        .expect(400);
+
+      expect(response2.body).toHaveProperty('error');
+      expect(response2.body.error).toContain('termid');
+    });
+
     test('GET /get-flexi-structure should require access token, sectionid, and flexirecordid', async () => {
       // First test without authorization token - should get 401
       const response1 = await request(app)
