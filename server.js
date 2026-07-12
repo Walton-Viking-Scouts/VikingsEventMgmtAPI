@@ -1409,7 +1409,7 @@ app.get('/oauth/callback', async (req, res) => {
           contentType,
           responseLength: rawResponseText ? rawResponseText.length : 0,
           responsePreview: rawResponseText
-            ? rawResponseText.substring(0, 500)
+            ? rawResponseText.substring(0, 2000)
             : 'No response text',
           isHTML: looksHTML || contentType.includes('text/html'),
           section: 'oauth-token-exchange',
@@ -1418,11 +1418,13 @@ app.get('/oauth/callback', async (req, res) => {
         });
 
         if (looksHTML || contentType.includes('text/html')) {
-          // HTML response - this is the error we're trying to capture
+          // HTML response - this is the error we're trying to capture.
+          // Capture a wide preview (OSM's "Blocked" page is ~8-9KB) so the full
+          // block message/reason is visible in Sentry, not just the <head>.
           logger.error('OSM returned HTML instead of JSON - likely blocking/error page', {
             status: tokenResponse.status,
             statusText: tokenResponse.statusText,
-            html_preview: rawResponseText.substring(0, 1000),
+            html_preview: rawResponseText.substring(0, 15000),
             html_length: rawResponseText.length,
             contentType,
             section: 'oauth-html-error',
