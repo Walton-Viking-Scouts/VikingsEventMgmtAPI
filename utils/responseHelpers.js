@@ -83,6 +83,20 @@ const sendServerError = (res, error, includeDetails = process.env.NODE_ENV === '
 };
 
 /**
+ * Detects whether a response body is OSM's rate-limit "Blocked" HTML page
+ * rather than the expected JSON payload. Anchored on the page title
+ * ("Online Scout Manager (OSM): Blocked") rather than the whole body: a
+ * false positive latches the frontend's cache-only kill-switch until the
+ * next sign-in, so over-matching is far costlier than falling back to the
+ * generic invalid-JSON error.
+ * @param {string} responseText - Raw response text from OSM API
+ * @returns {boolean} True if the response looks like OSM's blocked HTML page
+ */
+const detectBlockedResponse = (responseText) => {
+  return /^\s*</.test(responseText) && /<title>[^<]*blocked[^<]*<\/title>/i.test(responseText);
+};
+
+/**
  * Processes and parses JSON response text with error handling
  * @param {string} responseText - Raw response text from OSM API
  * @param {string} endpoint - Endpoint name for logging
@@ -153,6 +167,7 @@ module.exports = {
   sendRateLimitError,
   sendUnauthorizedResponse,
   sendServerError,
+  detectBlockedResponse,
   parseOSMResponse,
   parseOSMStartupResponse,
 };
