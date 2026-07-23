@@ -1,4 +1,4 @@
-const { detectBlockedResponse, parseOSMResponse } = require('../utils/responseHelpers');
+const { detectBlockedResponse } = require('../utils/responseHelpers');
 const { processOSMResponse } = require('../utils/osmApiHandler');
 
 const BLOCKED_HTML = `<!DOCTYPE html>
@@ -27,27 +27,19 @@ describe('detectBlockedResponse', () => {
   });
 });
 
-describe('parseOSMResponse', () => {
-  it('returns a 503 blocked shape for blocked HTML', () => {
-    const result = parseOSMResponse(BLOCKED_HTML, 'test-endpoint');
-    expect(result.success).toBe(false);
-    expect(result.blocked).toBe(true);
-    expect(result.status).toBe(503);
-    expect(result.error).toMatch(/blocked/i);
+describe('detectBlockedResponse title anchoring', () => {
+  it('returns false for HTML that mentions "blocked" only in the body', () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head><title>Online Scout Manager (OSM): Error</title></head>
+<body><p>Disable your pop-up blocker and blocked-content settings.</p></body>
+</html>`;
+    expect(detectBlockedResponse(html)).toBe(false);
   });
 
-  it('returns the existing 500 invalid-JSON shape for non-blocked HTML', () => {
-    const result = parseOSMResponse(NON_BLOCKED_HTML, 'test-endpoint');
-    expect(result.success).toBe(false);
-    expect(result.blocked).toBeUndefined();
-    expect(result.status).toBe(500);
-    expect(result.error).toBe('Invalid JSON response from OSM API');
-  });
-
-  it('returns success for valid JSON', () => {
-    const result = parseOSMResponse('{"foo": "bar"}', 'test-endpoint');
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual({ foo: 'bar' });
+  it('matches the blocked title case-insensitively', () => {
+    const html = '<html><head><title>OSM: BLOCKED</title></head><body></body></html>';
+    expect(detectBlockedResponse(html)).toBe(true);
   });
 });
 

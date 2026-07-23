@@ -121,16 +121,18 @@ const processOSMResponse = async (response, responseText, processResponse, req, 
       return {
         status: 503,
         json: {
-          error: 'OSM API access blocked - please wait before retrying',
+          error: 'OSM API access blocked - sign in again to reconnect',
           blocked: true,
           details: responseText.substring(0, 1000),
         },
       };
     }
+    // HTML gets the wide preview: 200 chars of an HTML page shows only the
+    // <head>, which is how the Blocked page went undiagnosed originally.
     endpointLogger.error('JSON parse error', {
       parseError: parseError.message,
       responseLength: responseText.length,
-      responsePreview: responseText.substring(0, 200),
+      responsePreview: responseText.substring(0, /^\s*</.test(responseText) ? 15000 : 200),
     });
     return {
       status: 500,

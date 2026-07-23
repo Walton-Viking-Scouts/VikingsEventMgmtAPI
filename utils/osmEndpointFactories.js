@@ -6,6 +6,7 @@ const {
   addRateLimitInfoToResponse,
 } = require('../middleware/rateLimiting');
 const { logger } = require('../config/sentry');
+const { detectBlockedResponse } = require('./responseHelpers');
 
 /**
  * Creates a simple OSM GET endpoint handler
@@ -281,7 +282,26 @@ const createStartupHandler = (endpoint, baseUrl) => {
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
       } catch (parseError) {
-        return res.status(500).json({ 
+        if (detectBlockedResponse(responseText)) {
+          logger.error('OSM returned Blocked page on startup data', {
+            sessionId,
+            parseError: parseError.message,
+            responseLength: responseText.length,
+            responsePreview: responseText.substring(0, 15000),
+          });
+          return res.status(503).json({
+            error: 'OSM API access blocked - sign in again to reconnect',
+            blocked: true,
+            details: responseText.substring(0, 1000),
+          });
+        }
+        logger.error('Invalid JSON in startup response from OSM API', {
+          sessionId,
+          parseError: parseError.message,
+          responseLength: responseText.length,
+          responsePreview: responseText.substring(0, /^\s*</.test(responseText) ? 15000 : 200),
+        });
+        return res.status(500).json({
           error: 'Invalid JSON in startup response from OSM API',
           details: jsonText.substring(0, 500),
         });
