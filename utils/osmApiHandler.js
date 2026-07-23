@@ -7,6 +7,12 @@ const {
 
 const { logger } = require('../config/sentry');
 const { detectBlockedResponse } = require('./responseHelpers');
+const {
+  shouldAllowRequest,
+  recordBlocked,
+  recordSuccess,
+  recordProbeFailure,
+} = require('./osmCircuitBreaker');
 const fallbackLogger = {
   info: console.log,
   warn: console.warn,
@@ -113,6 +119,7 @@ const processOSMResponse = async (response, responseText, processResponse, req, 
     data = JSON.parse(responseText);
   } catch (parseError) {
     if (detectBlockedResponse(responseText)) {
+      recordBlocked();
       endpointLogger.error('OSM returned Blocked page', {
         parseError: parseError.message,
         responseLength: responseText.length,
@@ -147,6 +154,8 @@ const processOSMResponse = async (response, responseText, processResponse, req, 
   if (processResponse) {
     data = processResponse(data, req);
   }
+
+  recordSuccess();
 
   // Success logging
   endpointLogger.info('Request completed successfully', {
@@ -203,6 +212,14 @@ const createOSMApiHandler = (endpoint, config) => {
       return res.status(validationError.status).json(validationError.json);
     }
 
+    if (!shouldAllowRequest()) {
+      endpointLogger.warn('OSM circuit breaker open - request blocked without calling OSM');
+      return res.status(503).json({
+        error: 'OSM API access blocked - sign in again to reconnect',
+        blocked: true,
+      });
+    }
+
     try {
       // Build request URL and options
       const url = buildUrl(req);
@@ -223,12 +240,13 @@ const createOSMApiHandler = (endpoint, config) => {
 
       // Handle rate limiting
       if (response.status === 429) {
+        recordProbeFailure();
         const osmInfo = getOSMRateLimitInfo(sessionId);
         endpointLogger.warn('Rate limit exceeded', {
           status: response.status,
           rateLimitInfo: osmInfo,
         });
-        return res.status(429).json({ 
+        return res.status(429).json({
           error: 'OSM API rate limit exceeded',
           rateLimitInfo: osmInfo,
           message: 'Please wait before making more requests',
@@ -237,13 +255,14 @@ const createOSMApiHandler = (endpoint, config) => {
 
       // Handle non-OK responses
       if (!response.ok) {
+        recordProbeFailure();
         const errorText = await response.text();
         endpointLogger.error('OSM API error', {
           status: response.status,
           statusText: response.statusText,
           errorText: errorText.substring(0, 500),
         });
-        return res.status(response.status).json({ 
+        return res.status(response.status).json({
           error: `OSM API error: ${response.status}`,
           details: errorText,
         });
@@ -259,6 +278,7 @@ const createOSMApiHandler = (endpoint, config) => {
       
       // Check if processing returned an error
       if (processResult.status) {
+        recordProbeFailure();
         return res.status(processResult.status).json(processResult.json);
       }
 
@@ -267,6 +287,7 @@ const createOSMApiHandler = (endpoint, config) => {
       res.json(responseWithRateInfo);
 
     } catch (err) {
+      recordProbeFailure();
       const status = Number.isInteger(err.status) ? err.status : 500;
       const isClientError = status >= 400 && status < 500;
       endpointLogger.error(isClientError ? 'Request validation failed' : 'Internal server error', {

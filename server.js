@@ -31,6 +31,8 @@ const {
   oAuthCallbackLogger,
 } = require('./utils/serverHelpers');
 const { osmHealthLogger } = require('./utils/osmHealthLogger');
+const { detectBlockedResponse } = require('./utils/responseHelpers');
+const osmCircuitBreaker = require('./utils/osmCircuitBreaker');
 
 // Successfully loaded documentation
 console.log('✅ Frontend API docs loaded:', frontendApiDocs.specs.info.title, '(' + Object.keys(frontendApiDocs.specs.paths).length + ' endpoints)');
@@ -601,6 +603,67 @@ app.post('/admin/tokens/clear', (req, res) => {
     message: `Cleared all ${clearedCount} tokens`,
     remaining: 0,
   });
+});
+
+/**
+ * Validates the x-admin-key header against process.env.ADMIN_API_KEY.
+ * Fails closed: an unset/empty ADMIN_API_KEY means the endpoint refuses
+ * everyone rather than accepting an empty key as valid.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {boolean} True if the caller is authorized (response untouched)
+ */
+const requireAdminKey = (req, res) => {
+  const adminKey = process.env.ADMIN_API_KEY;
+  if (!adminKey) {
+    res.status(503).json({ error: 'Admin endpoint not configured' });
+    return false;
+  }
+  if (req.headers['x-admin-key'] !== adminKey) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+};
+
+/**
+ * Admin: Inspect the OSM circuit breaker state.
+ * @tags Admin
+ * @route GET /admin/osm-breaker
+ * @returns {object} 200 - Breaker status
+ * @returns {object} 401 - Wrong or missing x-admin-key
+ * @returns {object} 503 - ADMIN_API_KEY not configured
+ */
+app.get('/admin/osm-breaker', (req, res) => {
+  if (!requireAdminKey(req, res)) {
+    return;
+  }
+  res.json(osmCircuitBreaker.getStatus());
+});
+
+/**
+ * Admin: Force-trip or force-reset the OSM circuit breaker.
+ * @tags Admin
+ * @route POST /admin/osm-breaker
+ * @param {object} req.body - { "action": "trip" | "reset" }
+ * @returns {object} 200 - Updated breaker status
+ * @returns {object} 400 - Unknown action
+ * @returns {object} 401 - Wrong or missing x-admin-key
+ * @returns {object} 503 - ADMIN_API_KEY not configured
+ */
+app.post('/admin/osm-breaker', (req, res) => {
+  if (!requireAdminKey(req, res)) {
+    return;
+  }
+  const { action } = req.body || {};
+  if (action === 'trip') {
+    osmCircuitBreaker.trip();
+  } else if (action === 'reset') {
+    osmCircuitBreaker.reset();
+  } else {
+    return res.status(400).json({ error: `Unknown action: ${action}` });
+  }
+  res.json(osmCircuitBreaker.getStatus());
 });
 
 /**
@@ -1418,6 +1481,9 @@ app.get('/oauth/callback', async (req, res) => {
         });
 
         if (looksHTML || contentType.includes('text/html')) {
+          if (detectBlockedResponse(rawResponseText)) {
+            osmCircuitBreaker.recordBlocked();
+          }
           // HTML response - this is the error we're trying to capture.
           // Capture a wide preview (OSM's "Blocked" page is ~8-9KB) so the full
           // block message/reason is visible in Sentry, not just the <head>.
@@ -1510,6 +1576,7 @@ app.get('/oauth/callback', async (req, res) => {
 
     // Log successful token exchange
     osmHealthLogger.logTokenExchange(true, tokenData);
+    osmCircuitBreaker.recordSuccess();
 
     if (!tokenData.access_token) {
       (logger?.error || console.error)('Missing access_token at redirect-build (defensive guard)', {
