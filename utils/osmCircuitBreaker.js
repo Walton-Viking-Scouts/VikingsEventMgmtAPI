@@ -10,6 +10,7 @@ let state = STATE_CLOSED;
 let trippedAt = null;
 let tripCount = 0;
 let probeInFlight = false;
+let generation = 0;
 
 /**
  * Builds the status snapshot shared by getStatus() and log calls.
@@ -41,6 +42,7 @@ const trip = () => {
   trippedAt = Date.now();
   tripCount += 1;
   probeInFlight = false;
+  generation += 1;
   logger.error('OSM circuit breaker tripped', buildStatus());
 };
 
@@ -85,9 +87,17 @@ const shouldAllowRequest = () => {
 /**
  * Called on any successfully-parsed OSM response. Closes the breaker if it
  * was half-open or open; no-op when already closed.
+ * @param {number} observedGeneration - The generation captured by the caller
+ *   at the moment its request was dispatched (via getGeneration()). If a
+ *   trip()/reset() has since bumped the generation, this observation is
+ *   stale (TOCTOU: the request was in flight during a state change it never
+ *   observed) and must be ignored rather than force-closing a fresh trip.
  * @returns {void}
  */
-const recordSuccess = () => {
+const recordSuccess = (observedGeneration) => {
+  if (observedGeneration !== generation) {
+    return;
+  }
   if (state === STATE_CLOSED) {
     return;
   }
@@ -107,9 +117,16 @@ const recordSuccess = () => {
  * resetting trippedAt to now, so the next request immediately becomes the
  * next probe attempt rather than the cooldown being pushed out another
  * full hour.
+ * @param {number} observedGeneration - The generation captured by the caller
+ *   at the moment its request was dispatched (via getGeneration()). A stale
+ *   pre-trip failure landing during a genuine half-open probe must not be
+ *   allowed to end a probe cycle it never belonged to.
  * @returns {void}
  */
-const recordProbeFailure = () => {
+const recordProbeFailure = (observedGeneration) => {
+  if (observedGeneration !== generation) {
+    return;
+  }
   if (state !== STATE_HALF_OPEN) {
     return;
   }
@@ -126,6 +143,8 @@ const reset = () => {
   trippedAt = null;
   tripCount = 0;
   probeInFlight = false;
+  generation += 1;
+  logger.warn('OSM circuit breaker reset', buildStatus());
 };
 
 /**
@@ -133,6 +152,17 @@ const reset = () => {
  * @returns {{state: string, trippedAt: string|null, tripCount: number, cooldownMs: number, secondsUntilProbe: number|null}}
  */
 const getStatus = () => buildStatus();
+
+/**
+ * Returns the current generation counter. Callers should capture this right
+ * after shouldAllowRequest() passes and pass it back into recordSuccess()/
+ * recordProbeFailure() so a forced trip()/reset() during the request can
+ * invalidate that stale observation (TOCTOU guard). Not reusing tripCount
+ * for this because reset() zeroes tripCount, which could make a stale
+ * generation match again after a reset.
+ * @returns {number} The current generation
+ */
+const getGeneration = () => generation;
 
 module.exports = {
   shouldAllowRequest,
@@ -142,4 +172,5 @@ module.exports = {
   reset,
   trip,
   getStatus,
+  getGeneration,
 };

@@ -12,6 +12,7 @@ const {
   recordBlocked,
   recordSuccess,
   recordProbeFailure,
+  getGeneration,
 } = require('./osmCircuitBreaker');
 const fallbackLogger = {
   info: console.log,
@@ -155,8 +156,6 @@ const processOSMResponse = async (response, responseText, processResponse, req, 
     data = processResponse(data, req);
   }
 
-  recordSuccess();
-
   // Success logging
   endpointLogger.info('Request completed successfully', {
     status: response.status,
@@ -220,6 +219,8 @@ const createOSMApiHandler = (endpoint, config) => {
       });
     }
 
+    const breakerGeneration = getGeneration();
+
     try {
       // Build request URL and options
       const url = buildUrl(req);
@@ -240,7 +241,7 @@ const createOSMApiHandler = (endpoint, config) => {
 
       // Handle rate limiting
       if (response.status === 429) {
-        recordProbeFailure();
+        recordProbeFailure(breakerGeneration);
         const osmInfo = getOSMRateLimitInfo(sessionId);
         endpointLogger.warn('Rate limit exceeded', {
           status: response.status,
@@ -255,7 +256,7 @@ const createOSMApiHandler = (endpoint, config) => {
 
       // Handle non-OK responses
       if (!response.ok) {
-        recordProbeFailure();
+        recordProbeFailure(breakerGeneration);
         const errorText = await response.text();
         endpointLogger.error('OSM API error', {
           status: response.status,
@@ -278,16 +279,18 @@ const createOSMApiHandler = (endpoint, config) => {
       
       // Check if processing returned an error
       if (processResult.status) {
-        recordProbeFailure();
+        recordProbeFailure(breakerGeneration);
         return res.status(processResult.status).json(processResult.json);
       }
+
+      recordSuccess(breakerGeneration);
 
       // Send successful response with rate limit info
       const responseWithRateInfo = addRateLimitInfoToResponse(req, res, processResult.data);
       res.json(responseWithRateInfo);
 
     } catch (err) {
-      recordProbeFailure();
+      recordProbeFailure(breakerGeneration);
       const status = Number.isInteger(err.status) ? err.status : 500;
       const isClientError = status >= 400 && status < 500;
       endpointLogger.error(isClientError ? 'Request validation failed' : 'Internal server error', {

@@ -12,6 +12,7 @@ const {
   recordBlocked,
   recordSuccess,
   recordProbeFailure,
+  getGeneration,
 } = require('./osmCircuitBreaker');
 
 /**
@@ -229,6 +230,8 @@ const createStartupHandler = (endpoint, baseUrl) => {
       });
     }
 
+    const breakerGeneration = getGeneration();
+
     try {
       const response = await makeOSMRequest(baseUrl, {
         method: 'GET',
@@ -238,7 +241,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
       }, sessionId);
 
       if (response.status === 429) {
-        recordProbeFailure();
+        recordProbeFailure(breakerGeneration);
         const osmInfo = getOSMRateLimitInfo(sessionId);
         return res.status(429).json({
           error: 'OSM API rate limit exceeded',
@@ -261,7 +264,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
         }
 
         if (fallback.data) {
-          recordSuccess();
+          recordSuccess(breakerGeneration);
           logger.info('Startup data served from oauth/resource fallback', {
             sessionId,
             section: 'startup-fallback',
@@ -270,7 +273,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
           return res.json(responseWithRateInfo);
         }
 
-        recordProbeFailure();
+        recordProbeFailure(breakerGeneration);
 
         if (fallback.failureStatus === 429) {
           const osmInfo = getOSMRateLimitInfo(sessionId);
@@ -287,7 +290,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
       }
 
       if (!response.ok) {
-        recordProbeFailure();
+        recordProbeFailure(breakerGeneration);
         return res.status(response.status).json({ error: `OSM API error: ${response.status}` });
       }
 
@@ -298,7 +301,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
 
       try {
         const data = JSON.parse(jsonText);
-        recordSuccess();
+        recordSuccess(breakerGeneration);
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
       } catch (parseError) {
@@ -316,7 +319,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
             details: responseText.substring(0, 1000),
           });
         }
-        recordProbeFailure();
+        recordProbeFailure(breakerGeneration);
         logger.error('Invalid JSON in startup response from OSM API', {
           sessionId,
           parseError: parseError.message,
@@ -329,7 +332,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
         });
       }
     } catch (err) {
-      recordProbeFailure();
+      recordProbeFailure(breakerGeneration);
       res.status(500).json({ error: 'Internal Server Error', details: err.message });
     }
   };

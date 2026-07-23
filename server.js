@@ -1406,6 +1406,8 @@ app.get('/oauth/callback', async (req, res) => {
     
     oAuthCallbackLogger.logTokenExchange(tokenPayload);
 
+    const breakerGeneration = osmCircuitBreaker.getGeneration();
+
     // Retry logic for token exchange with better timeout handling
     let tokenResponse;
     const maxRetries = 2;
@@ -1576,7 +1578,7 @@ app.get('/oauth/callback', async (req, res) => {
 
     // Log successful token exchange
     osmHealthLogger.logTokenExchange(true, tokenData);
-    osmCircuitBreaker.recordSuccess();
+    osmCircuitBreaker.recordSuccess(breakerGeneration);
 
     if (!tokenData.access_token) {
       (logger?.error || console.error)('Missing access_token at redirect-build (defensive guard)', {

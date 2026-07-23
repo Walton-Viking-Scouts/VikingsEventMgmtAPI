@@ -49,8 +49,9 @@ describe('osmCircuitBreaker', () => {
     breaker.recordBlocked();
     jest.setSystemTime(new Date(Date.now() + COOLDOWN_MS));
     breaker.shouldAllowRequest();
+    const generation = breaker.getGeneration();
 
-    breaker.recordSuccess();
+    breaker.recordSuccess(generation);
 
     const status = breaker.getStatus();
     expect(status.state).toBe('closed');
@@ -77,8 +78,9 @@ describe('osmCircuitBreaker', () => {
     breaker.recordBlocked();
     jest.setSystemTime(new Date(Date.now() + COOLDOWN_MS));
     breaker.shouldAllowRequest();
+    const generation = breaker.getGeneration();
 
-    breaker.recordProbeFailure();
+    breaker.recordProbeFailure(generation);
 
     expect(breaker.getStatus().state).toBe('open');
     expect(breaker.shouldAllowRequest()).toBe(true);
@@ -87,12 +89,12 @@ describe('osmCircuitBreaker', () => {
 
   it('no-ops recordProbeFailure when not half-open', () => {
     expect(breaker.getStatus().state).toBe('closed');
-    breaker.recordProbeFailure();
+    breaker.recordProbeFailure(breaker.getGeneration());
     expect(breaker.getStatus().state).toBe('closed');
   });
 
   it('no-ops recordSuccess when already closed', () => {
-    breaker.recordSuccess();
+    breaker.recordSuccess(breaker.getGeneration());
     expect(breaker.getStatus().tripCount).toBe(0);
     expect(breaker.getStatus().state).toBe('closed');
   });
@@ -129,5 +131,46 @@ describe('osmCircuitBreaker', () => {
     const status = breaker.getStatus();
     expect(status.secondsUntilProbe).toBeGreaterThan(0);
     expect(status.secondsUntilProbe).toBeLessThanOrEqual(Math.ceil(COOLDOWN_MS / 1000));
+  });
+
+  describe('TOCTOU generation guard', () => {
+    it('ignores a stale recordSuccess from before a fresh trip, so the breaker stays open', () => {
+      const staleGeneration = breaker.getGeneration();
+
+      breaker.trip();
+      breaker.recordSuccess(staleGeneration);
+
+      expect(breaker.getStatus().state).toBe('open');
+      expect(breaker.shouldAllowRequest()).toBe(false);
+    });
+
+    it('ignores a stale recordProbeFailure from before the trip that started the probe, leaving the probe in flight', () => {
+      const staleGeneration = breaker.getGeneration();
+
+      breaker.recordBlocked();
+      jest.setSystemTime(new Date(Date.now() + COOLDOWN_MS));
+      expect(breaker.shouldAllowRequest()).toBe(true);
+      expect(breaker.getStatus().state).toBe('half-open');
+      const currentGeneration = breaker.getGeneration();
+
+      breaker.recordProbeFailure(staleGeneration);
+
+      expect(breaker.getStatus().state).toBe('half-open');
+      expect(breaker.shouldAllowRequest()).toBe(false);
+
+      breaker.recordSuccess(currentGeneration);
+      expect(breaker.getStatus().state).toBe('closed');
+    });
+
+    it('ignores a pre-reset generation after a subsequent trip', () => {
+      breaker.recordBlocked();
+      const preResetGeneration = breaker.getGeneration();
+
+      breaker.reset();
+      breaker.trip();
+      breaker.recordSuccess(preResetGeneration);
+
+      expect(breaker.getStatus().state).toBe('open');
+    });
   });
 });
