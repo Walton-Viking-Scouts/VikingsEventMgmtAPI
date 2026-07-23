@@ -6,6 +6,7 @@ const {
 } = require('../middleware/rateLimiting');
 
 const { logger } = require('../config/sentry');
+const { detectBlockedResponse } = require('./responseHelpers');
 const fallbackLogger = {
   info: console.log,
   warn: console.warn,
@@ -111,6 +112,21 @@ const processOSMResponse = async (response, responseText, processResponse, req, 
   try {
     data = JSON.parse(responseText);
   } catch (parseError) {
+    if (detectBlockedResponse(responseText)) {
+      endpointLogger.error('OSM returned Blocked page', {
+        parseError: parseError.message,
+        responseLength: responseText.length,
+        responsePreview: responseText.substring(0, 15000),
+      });
+      return {
+        status: 503,
+        json: {
+          error: 'OSM API access blocked - please wait before retrying',
+          blocked: true,
+          details: responseText.substring(0, 1000),
+        },
+      };
+    }
     endpointLogger.error('JSON parse error', {
       parseError: parseError.message,
       responseLength: responseText.length,
@@ -118,7 +134,7 @@ const processOSMResponse = async (response, responseText, processResponse, req, 
     });
     return {
       status: 500,
-      json: { 
+      json: {
         error: 'Invalid JSON response from OSM API',
         details: responseText.substring(0, 500),
       },

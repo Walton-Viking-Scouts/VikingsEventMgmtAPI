@@ -83,6 +83,16 @@ const sendServerError = (res, error, includeDetails = process.env.NODE_ENV === '
 };
 
 /**
+ * Detects whether a response body is OSM's rate-limit "Blocked" HTML page
+ * rather than the expected JSON payload
+ * @param {string} responseText - Raw response text from OSM API
+ * @returns {boolean} True if the response looks like OSM's blocked HTML page
+ */
+const detectBlockedResponse = (responseText) => {
+  return /^\s*</.test(responseText) && /blocked/i.test(responseText);
+};
+
+/**
  * Processes and parses JSON response text with error handling
  * @param {string} responseText - Raw response text from OSM API
  * @param {string} endpoint - Endpoint name for logging
@@ -104,6 +114,15 @@ const parseOSMResponse = (responseText, _endpoint) => {
       data,
     };
   } catch (parseError) {
+    if (detectBlockedResponse(responseText)) {
+      return {
+        success: false,
+        error: 'OSM API access blocked - please wait before retrying',
+        blocked: true,
+        details: responseText.substring(0, 1000),
+        status: 503,
+      };
+    }
     return {
       success: false,
       error: 'Invalid JSON response from OSM API',
@@ -153,6 +172,7 @@ module.exports = {
   sendRateLimitError,
   sendUnauthorizedResponse,
   sendServerError,
+  detectBlockedResponse,
   parseOSMResponse,
   parseOSMStartupResponse,
 };
