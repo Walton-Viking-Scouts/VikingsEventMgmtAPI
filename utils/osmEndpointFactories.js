@@ -7,6 +7,13 @@ const {
 } = require('../middleware/rateLimiting');
 const { logger } = require('../config/sentry');
 const { detectBlockedResponse } = require('./responseHelpers');
+const {
+  shouldAllowRequest,
+  recordBlocked,
+  recordSuccess,
+  recordProbeFailure,
+  getGeneration,
+} = require('./osmCircuitBreaker');
 
 /**
  * Creates a simple OSM GET endpoint handler
@@ -215,6 +222,16 @@ const createStartupHandler = (endpoint, baseUrl) => {
       return res.status(401).json({ error: 'Access token is required in Authorization header' });
     }
 
+    if (!shouldAllowRequest()) {
+      logger.warn('OSM circuit breaker open - startup request blocked without calling OSM', { sessionId });
+      return res.status(503).json({
+        error: 'OSM API access blocked - sign in again to reconnect',
+        blocked: true,
+      });
+    }
+
+    const breakerGeneration = getGeneration();
+
     try {
       const response = await makeOSMRequest(baseUrl, {
         method: 'GET',
@@ -224,8 +241,9 @@ const createStartupHandler = (endpoint, baseUrl) => {
       }, sessionId);
 
       if (response.status === 429) {
+        recordProbeFailure(breakerGeneration);
         const osmInfo = getOSMRateLimitInfo(sessionId);
-        return res.status(429).json({ 
+        return res.status(429).json({
           error: 'OSM API rate limit exceeded',
           rateLimitInfo: osmInfo,
           message: 'Please wait before making more requests',
@@ -246,6 +264,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
         }
 
         if (fallback.data) {
+          recordSuccess(breakerGeneration);
           logger.info('Startup data served from oauth/resource fallback', {
             sessionId,
             section: 'startup-fallback',
@@ -253,6 +272,8 @@ const createStartupHandler = (endpoint, baseUrl) => {
           const responseWithRateInfo = addRateLimitInfoToResponse(req, res, fallback.data);
           return res.json(responseWithRateInfo);
         }
+
+        recordProbeFailure(breakerGeneration);
 
         if (fallback.failureStatus === 429) {
           const osmInfo = getOSMRateLimitInfo(sessionId);
@@ -269,20 +290,23 @@ const createStartupHandler = (endpoint, baseUrl) => {
       }
 
       if (!response.ok) {
+        recordProbeFailure(breakerGeneration);
         return res.status(response.status).json({ error: `OSM API error: ${response.status}` });
       }
 
       const responseText = await response.text();
-      
+
       // OSM startup endpoint returns JavaScript code, remove first 18 characters to get JSON
       const jsonText = responseText.substring(18);
-      
+
       try {
         const data = JSON.parse(jsonText);
+        recordSuccess(breakerGeneration);
         const responseWithRateInfo = addRateLimitInfoToResponse(req, res, data);
         res.json(responseWithRateInfo);
       } catch (parseError) {
         if (detectBlockedResponse(responseText)) {
+          recordBlocked();
           logger.error('OSM returned Blocked page on startup data', {
             sessionId,
             parseError: parseError.message,
@@ -295,6 +319,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
             details: responseText.substring(0, 1000),
           });
         }
+        recordProbeFailure(breakerGeneration);
         logger.error('Invalid JSON in startup response from OSM API', {
           sessionId,
           parseError: parseError.message,
@@ -307,6 +332,7 @@ const createStartupHandler = (endpoint, baseUrl) => {
         });
       }
     } catch (err) {
+      recordProbeFailure(breakerGeneration);
       res.status(500).json({ error: 'Internal Server Error', details: err.message });
     }
   };
