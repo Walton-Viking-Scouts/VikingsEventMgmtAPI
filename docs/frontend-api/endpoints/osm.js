@@ -369,7 +369,15 @@
  *                   properties:
  *                     schemeid:
  *                       type: string
+ *                     accountid:
+ *                       type: string
  *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     paynow:
+ *                       type: string
+ *                     preauth_amount:
  *                       type: string
  *                     archived:
  *                       type: string
