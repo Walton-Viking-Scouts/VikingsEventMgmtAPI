@@ -390,15 +390,30 @@ curl "https://your-backend-api.com/get-payment-schemes?sectionid=49097" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-**Response (200 OK):**
+**Response (200 OK)** (captured from OSM on 2026-09-04):
 ```json
 {
+  "identifier": "schemeid",
+  "label": "name",
+  "has_accounts": true,
   "items": [
-    { "schemeid": "60603", "name": "General Subscriptions" }
+    {
+      "schemeid": "60603",
+      "accountid": 11507,
+      "name": "General Subscriptions",
+      "currency": "GBP",
+      "require_all": 0,
+      "one_off_payments": false,
+      "amount_overdue": "0.00"
+    }
   ],
+  "bank_accounts": [ { "name": "…", "accountid": "11507", "gateway": "gocardless" } ],
+  "config": { "...section config, same object as /get-user-roles sectionConfig..." },
   "_rateLimitInfo": { ... }
 }
 ```
+
+`amount_overdue` is the scheme-wide overdue total, ready for a summary tile.
 
 #### GET /get-payment-schedule
 
@@ -431,31 +446,71 @@ to pay (the gem calls it `require_all`).
 
 #### GET /get-payment-status
 
-Per-member payment status for a scheme and term. Each item is one member;
-each payment from the schedule appears under its `paymentid` as a JSON
-**string** containing a `status` history array (newest state is the one to
-show). Status values seen: `Payment required`, `Payment not required`,
-`Initiated`, `Paid`, `Received`, `Paid manually`.
+Per-member payment status for a scheme and term. Always send `payload=1`
+(the OSM UI does): the response is then an envelope whose `data.members`
+entries carry one **object** per payment, keyed by `paymentid`. Without
+`payload`, community clients report a flat `items` array where each payment
+is a JSON *string* instead.
 
-**Query Parameters:** `sectionid`, `schemeid`, `termid` (required); `payload` (optional, the OSM UI sends `payload=1`)
+**Query Parameters:** `sectionid`, `schemeid`, `termid` (required); `payload` (send `1`)
 
-**Response (200 OK):**
+**Response (200 OK)** (captured from OSM on 2026-09-04, `payload=1`):
 ```json
 {
-  "items": [
-    {
-      "scoutid": "555",
-      "firstname": "Ada",
-      "lastname": "L",
-      "patrolid": "1",
-      "startdate": "2026-09-01",
-      "directdebit": "Active",
-      "123": "{\"status\":[{\"statusid\":\"9\",\"status\":\"Paid\",\"statustimestamp\":\"15/09/2026 10:02\",\"details\":\"\",\"who\":\"1\",\"firstname\":\"Ada\"}]}"
-    }
-  ],
+  "status": true,
+  "error": null,
+  "data": {
+    "members": [
+      {
+        "scoutid": "2111171",
+        "firstname": "…",
+        "lastname": "…",
+        "dob": "…",
+        "patrolid": "119078",
+        "patrolleader": "2",
+        "photo_guid": "…",
+        "startdate": "2024-09-26",
+        "directdebit": "Active",
+        "can_remove": true,
+        "975153": {
+          "date": "2025-04-01",
+          "amount": "26.00",
+          "active": true,
+          "defaulton": true,
+          "status": [
+            {
+              "statusid": "49259537",
+              "scoutid": "2111171",
+              "schemeid": "60603",
+              "paymentid": "975153",
+              "statustimestamp": "2025-04-01 11:23:00",
+              "status": "Payment required",
+              "details": "",
+              "editable": "0",
+              "prevent_automatic_billing": "0",
+              "latest": "0",
+              "who": "…",
+              "firstname": "…"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": [],
   "_rateLimitInfo": { ... }
 }
 ```
+
+Per-payment object: `date` (due date), `amount`, `active` (the payment
+applies to this member; `false` for payments dated before they joined),
+`defaulton` (member is expected to pay it), `status` (history, **newest
+first**). The entry with `"latest": "1"` is the current state and is the first
+element; an empty `status` array means nothing has happened yet (a future
+payment, or an inactive one). `directdebit` is `Active` or `Inactive`. A
+normal successful sequence is `Initiated` → `Submitted` → `Paid` → `Received`;
+other values seen: `Payment required`, `Payment not required`; the gem also
+lists `Paid manually`.
 
 ## Error Responses
 

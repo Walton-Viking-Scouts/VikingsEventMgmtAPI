@@ -415,7 +415,7 @@
  *   get:
  *     summary: Get member payment status for a scheme and term
  *     description: |
- *       Retrieves each member's status for every payment in the scheme and term. Each item is one member; each payment appears under its paymentid as a JSON string holding a status history array. Status values seen: Payment required, Payment not required, Initiated, Paid, Received, Paid manually.
+ *       Retrieves each member's status for every payment in the scheme and term. Send payload=1 (as the OSM UI does): the response is then an envelope { status, error, data: { members: [...] }, meta } where each member carries one object per payment keyed by paymentid: { date, amount, active, defaulton, status: [...] }. The status history is newest first and the entry with latest "1" is the current state. Values seen: Initiated, Submitted, Paid, Received, Payment required, Payment not required (the community gem also lists Paid manually). Without payload the members come back as a flat items array with each payment as a JSON string.
  *
  *       Proxies `ext/finances/onlinepayments/?action=getPaymentStatus`. Requires the `section:finance:read` OSM OAuth scope.
  *     tags: [OSM Finance]
@@ -450,7 +450,7 @@
  *         example: "1"
  *     responses:
  *       200:
- *         description: Members with per-payment status strings
+ *         description: Envelope with members and their per-payment objects (payload=1 form)
  *         content:
  *           application/json:
  *             schema:
@@ -458,26 +458,83 @@
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
  *                   properties:
- *                     items:
+ *                     status:
+ *                       type: boolean
+ *                     error:
+ *                       nullable: true
+ *                     meta:
  *                       type: array
- *                       items:
- *                         type: object
- *                         additionalProperties:
- *                           type: string
- *                           description: Keyed by paymentid; a JSON string of the form {"status":[{"statusid","status","statustimestamp","details","who","firstname"}]}
- *                         properties:
- *                           scoutid:
- *                             type: string
- *                           firstname:
- *                             type: string
- *                           lastname:
- *                             type: string
- *                           patrolid:
- *                             type: string
- *                           startdate:
- *                             type: string
- *                           directdebit:
- *                             type: string
+ *                       items: {}
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         members:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             additionalProperties:
+ *                               type: object
+ *                               description: Keyed by paymentid
+ *                               properties:
+ *                                 date:
+ *                                   type: string
+ *                                   example: "2025-04-01"
+ *                                 amount:
+ *                                   type: string
+ *                                   example: "26.00"
+ *                                 active:
+ *                                   type: boolean
+ *                                 defaulton:
+ *                                   type: boolean
+ *                                 status:
+ *                                   type: array
+ *                                   description: History, newest first; the entry with latest "1" is current
+ *                                   items:
+ *                                     type: object
+ *                                     properties:
+ *                                       statusid:
+ *                                         type: string
+ *                                       status:
+ *                                         type: string
+ *                                         example: "Received"
+ *                                       statustimestamp:
+ *                                         type: string
+ *                                         example: "2025-04-08 11:58:00"
+ *                                       latest:
+ *                                         type: string
+ *                                         example: "1"
+ *                                       details:
+ *                                         type: string
+ *                                       editable:
+ *                                         type: string
+ *                                       prevent_automatic_billing:
+ *                                         type: string
+ *                                       who:
+ *                                         type: string
+ *                                       firstname:
+ *                                         type: string
+ *                             properties:
+ *                               scoutid:
+ *                                 type: string
+ *                               firstname:
+ *                                 type: string
+ *                               lastname:
+ *                                 type: string
+ *                               dob:
+ *                                 type: string
+ *                               patrolid:
+ *                                 type: string
+ *                               patrolleader:
+ *                                 type: string
+ *                               photo_guid:
+ *                                 type: string
+ *                               startdate:
+ *                                 type: string
+ *                               directdebit:
+ *                                 type: string
+ *                                 example: "Active"
+ *                               can_remove:
+ *                                 type: boolean
  *       400:
  *         description: Missing required parameters
  *         content:

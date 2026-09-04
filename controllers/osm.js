@@ -325,7 +325,7 @@ const getSharedEventAttendance = osmEndpoints.getSharedEventAttendance();
  * @param {string|number} query.sectionid - Section id
  * @returns {object} 200 - Payment schemes configured for the section
  * @example Success response
- * { "items": [ { "schemeid": "60603", "name": "General Subscriptions" } ] }
+ * { "identifier": "schemeid", "items": [ { "schemeid": "60603", "accountid": 11507, "name": "General Subscriptions", "currency": "GBP", "require_all": 0, "one_off_payments": false, "amount_overdue": "0.00" } ], "bank_accounts": [], "config": {} }
  * @example Error response (missing params)
  * { "error": "Missing required parameters: sectionid" }
  */
@@ -355,9 +355,10 @@ const getPaymentSchedule = osmEndpoints.getPaymentSchedule();
 /**
  * OSM: Get per-member payment status for a scheme and term.
  *
- * Proxies `ext/finances/onlinepayments/?action=getPaymentStatus`. Each item is
- * a member; each payment appears under its `paymentid` key as a JSON string
- * holding a `status` history array.
+ * Proxies `ext/finances/onlinepayments/?action=getPaymentStatus`. With
+ * `payload=1` (what the OSM UI sends) the response is an envelope whose
+ * `data.members` entries carry one object per payment keyed by `paymentid`,
+ * each with a `status` history whose `latest: "1"` entry is the current state.
  *
  * @tags OSM Finance
  * @route GET /get-payment-status
@@ -365,10 +366,10 @@ const getPaymentSchedule = osmEndpoints.getPaymentSchedule();
  * @param {string|number} query.sectionid - Section id
  * @param {string|number} query.schemeid - Payment scheme id
  * @param {string|number} query.termid - Term id
- * @param {string} [query.payload] - Set to 1 to include the detailed payload OSM's own UI requests
+ * @param {string} [query.payload] - Send 1 for the per-payment object form
  * @returns {object} 200 - Member payment status
- * @example Success response
- * { "items": [ { "scoutid": "555", "firstname": "Ada", "lastname": "L", "patrolid": "1", "directdebit": "Active", "123": "{\"status\":[{\"statusid\":\"9\",\"status\":\"Paid\",\"statustimestamp\":\"15/09/2026 10:02\",\"details\":\"\",\"who\":\"1\",\"firstname\":\"Ada\"}]}" } ] }
+ * @example Success response (payload=1)
+ * { "status": true, "error": null, "data": { "members": [ { "scoutid": "555", "firstname": "Ada", "lastname": "L", "patrolid": "1", "startdate": "2024-09-26", "directdebit": "Active", "975153": { "date": "2025-04-01", "amount": "26.00", "active": true, "defaulton": true, "status": [ { "statusid": "49259537", "status": "Paid", "statustimestamp": "2025-04-08 11:58:00", "latest": "1", "details": "", "editable": "0" } ] } } ] }, "meta": [] }
  * @example Error response (missing params)
  * { "error": "Missing required parameters: sectionid, schemeid, termid" }
  */
