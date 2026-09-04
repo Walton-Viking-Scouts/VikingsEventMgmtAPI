@@ -317,94 +317,62 @@ const getSharedEventAttendance = osmEndpoints.getSharedEventAttendance();
  * OSM: Get online payment schemes (subscriptions) for a section.
  *
  * Proxies `ext/finances/onlinepayments/?action=getSchemes`. Requires the
- * `section:finance:read` OAuth scope.
+ * `section:finance:read` OAuth scope and finance read permission on the section.
  *
  * @tags OSM Finance
  * @route GET /get-payment-schemes
  * @header Authorization {string}
- * @param {string|number} query.section_id - Section id
+ * @param {string|number} query.sectionid - Section id
  * @returns {object} 200 - Payment schemes configured for the section
  * @example Success response
- * { "schemes": [ { "scheme_id": 12345, "name": "Subscriptions 2025/26", "status": "active" } ] }
+ * { "items": [ { "schemeid": "60603", "name": "General Subscriptions" } ] }
  * @example Error response (missing params)
- * { "error": "Missing required parameters: section_id" }
+ * { "error": "Missing required parameters: sectionid" }
  */
 const getPaymentSchemes = osmEndpoints.getPaymentSchemes();
 
 /**
- * OSM: Get the payment schedule for a scheme.
+ * OSM: Get the payment schedule (scheme settings and dated payments) for a scheme.
  *
- * Proxies `ext/finances/onlinepayments/schedule/?action=getPaymentSchedule`.
- * Omit `term_id` (or pass `all=1`) for the all-time schedule.
+ * Proxies `ext/finances/onlinepayments/?action=getPaymentSchedule`. Pass
+ * `termid` for one term's payments or `allpayments=true` for every payment.
  *
  * @tags OSM Finance
  * @route GET /get-payment-schedule
  * @header Authorization {string}
- * @param {string|number} query.section_id - Section id
- * @param {string|number} query.scheme_id - Payment scheme id
- * @param {string|number} [query.term_id] - Term id (optional)
- * @param {string|number} [query.all] - Set to 1 for the all-time schedule
- * @returns {object} 200 - Scheduled payments for the scheme
+ * @param {string|number} query.sectionid - Section id
+ * @param {string|number} query.schemeid - Payment scheme id
+ * @param {string|number} [query.termid] - Term id
+ * @param {string} [query.allpayments] - Set to true for the all-time schedule
+ * @returns {object} 200 - Scheme settings plus its payments array
  * @example Success response
- * { "payments": [ { "date": "2025-10-01", "amount": 45.00, "description": "Autumn subs" } ] }
+ * { "schemeid": "60603", "name": "General Subscriptions", "archived": "0", "giftaid": "1", "defaulton": "1", "payments": [ { "paymentid": "123", "name": "Autumn 2026", "date": "2026-09-15", "amount": "45.00", "archived": "0" } ] }
  * @example Error response (missing params)
- * { "error": "Missing required parameters: section_id, scheme_id" }
+ * { "error": "Missing required parameters: sectionid, schemeid" }
  */
 const getPaymentSchedule = osmEndpoints.getPaymentSchedule();
 
 /**
- * OSM: Get detailed payment schedule information including member payment history.
- *
- * Proxies `ext/finances/onlinepayments/details/?action=getDetails`.
- *
- * @tags OSM Finance
- * @route GET /get-payment-schedule-details
- * @header Authorization {string}
- * @param {string|number} query.section_id - Section id
- * @param {string|number} query.scheme_id - Payment scheme id
- * @param {string|number} query.term_id - Term id
- * @returns {object} 200 - Schedule details
- * @example Error response (missing params)
- * { "error": "Missing required parameters: section_id, scheme_id, term_id" }
- */
-const getPaymentScheduleDetails = osmEndpoints.getPaymentScheduleDetails();
-
-/**
  * OSM: Get per-member payment status for a scheme and term.
  *
- * Proxies `ext/finances/onlinepayments/status/?action=getPaymentStatus`.
+ * Proxies `ext/finances/onlinepayments/?action=getPaymentStatus`. Each item is
+ * a member; each payment appears under its `paymentid` key as a JSON string
+ * holding a `status` history array.
  *
  * @tags OSM Finance
  * @route GET /get-payment-status
  * @header Authorization {string}
- * @param {string|number} query.section_id - Section id
- * @param {string|number} query.scheme_id - Payment scheme id
- * @param {string|number} query.term_id - Term id
- * @param {boolean} [query.include_payload] - Include detailed payment data
+ * @param {string|number} query.sectionid - Section id
+ * @param {string|number} query.schemeid - Payment scheme id
+ * @param {string|number} query.termid - Term id
+ * @param {string} [query.payload] - Set to 1 to include the detailed payload OSM's own UI requests
  * @returns {object} 200 - Member payment status
  * @example Success response
- * { "members": [ { "member_id": 555, "payment_status": "paid" }, { "member_id": 556, "payment_status": "overdue" } ] }
+ * { "items": [ { "scoutid": "555", "firstname": "Ada", "lastname": "L", "patrolid": "1", "directdebit": "Active", "123": "{\"status\":[{\"statusid\":\"9\",\"status\":\"Paid\",\"statustimestamp\":\"15/09/2026 10:02\",\"details\":\"\",\"who\":\"1\",\"firstname\":\"Ada\"}]}" } ] }
  * @example Error response (missing params)
- * { "error": "Missing required parameters: section_id, scheme_id, term_id" }
+ * { "error": "Missing required parameters: sectionid, schemeid, termid" }
  */
 const getPaymentStatus = osmEndpoints.getPaymentStatus();
-
-/**
- * OSM: Get members who have not started paying for a scheme and term.
- *
- * Proxies `ext/finances/onlinepayments/uninitiated/?action=getUninitiated`.
- *
- * @tags OSM Finance
- * @route GET /get-uninitiated-payments
- * @header Authorization {string}
- * @param {string|number} query.section_id - Section id
- * @param {string|number} query.scheme_id - Payment scheme id
- * @param {string|number} query.term_id - Term id
- * @returns {object} 200 - Members who have not initiated payment
- * @example Error response (missing params)
- * { "error": "Missing required parameters: section_id, scheme_id, term_id" }
- */
-const getUninitiatedPayments = osmEndpoints.getUninitiatedPayments();
 
 /**
  * OSM: Update a single FlexiRecord field for one member.
@@ -735,9 +703,7 @@ module.exports = {
   // Online payments / subscriptions
   getPaymentSchemes,
   getPaymentSchedule,
-  getPaymentScheduleDetails,
   getPaymentStatus,
-  getUninitiatedPayments,
 
   // Members and Contacts
   getContactDetails,

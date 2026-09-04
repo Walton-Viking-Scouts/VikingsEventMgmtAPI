@@ -384,6 +384,11 @@ const ONLINE_PAYMENTS_BASE = 'https://www.onlinescoutmanager.co.uk/ext/finances/
 /**
  * Creates a handler for an OSM online payments (subscriptions) endpoint.
  *
+ * Every online payments action lives on the same base URL and is selected by
+ * the `action` query value; OSM's own web app and community clients use the
+ * query names `sectionid`, `schemeid` and `termid`, and OSM answers 405
+ * "Invalid parameter" to anything else.
+ *
  * Only the named query parameters are forwarded to OSM, so callers cannot
  * inject arbitrary query keys into the finance API. Every forwarded value must
  * be a single string from the query string; array/object values (repeated or
@@ -394,13 +399,12 @@ const ONLINE_PAYMENTS_BASE = 'https://www.onlinescoutmanager.co.uk/ext/finances/
  * a bare scalar as `{ value }`, so the rate-limit wrapper cannot mangle it.
  *
  * @param {string} endpoint - Endpoint name for logging
- * @param {string} path - Path segment under the online payments base URL ('' for the root)
  * @param {string} action - OSM `action` query value
  * @param {Array<string>} requiredParams - Required query parameters
  * @param {Array<string>} [optionalParams] - Optional query parameters forwarded when present
  * @returns {Function} Express request handler
  */
-const createOnlinePaymentsHandler = (endpoint, path, action, requiredParams, optionalParams = []) => {
+const createOnlinePaymentsHandler = (endpoint, action, requiredParams, optionalParams = []) => {
   const forwardedParams = [...requiredParams, ...optionalParams];
 
   const validationError = (message) => {
@@ -414,7 +418,7 @@ const createOnlinePaymentsHandler = (endpoint, path, action, requiredParams, opt
     method: 'GET',
     requiredParams,
     buildUrl: (req) => {
-      const url = new URL(`${ONLINE_PAYMENTS_BASE}${path}`);
+      const url = new URL(ONLINE_PAYMENTS_BASE);
       url.searchParams.set('action', action);
 
       const invalid = forwardedParams.filter((param) => {
@@ -638,39 +642,22 @@ const osmEndpoints = {
   // Online payments / subscriptions endpoints (require section:finance:read scope)
   getPaymentSchemes: () => createOnlinePaymentsHandler(
     'getPaymentSchemes',
-    '',
     'getSchemes',
-    ['section_id'],
+    ['sectionid'],
   ),
 
   getPaymentSchedule: () => createOnlinePaymentsHandler(
     'getPaymentSchedule',
-    'schedule/',
     'getPaymentSchedule',
-    ['section_id', 'scheme_id'],
-    ['term_id', 'all'],
-  ),
-
-  getPaymentScheduleDetails: () => createOnlinePaymentsHandler(
-    'getPaymentScheduleDetails',
-    'details/',
-    'getDetails',
-    ['section_id', 'scheme_id', 'term_id'],
+    ['sectionid', 'schemeid'],
+    ['termid', 'allpayments'],
   ),
 
   getPaymentStatus: () => createOnlinePaymentsHandler(
     'getPaymentStatus',
-    'status/',
     'getPaymentStatus',
-    ['section_id', 'scheme_id', 'term_id'],
-    ['include_payload'],
-  ),
-
-  getUninitiatedPayments: () => createOnlinePaymentsHandler(
-    'getUninitiatedPayments',
-    'uninitiated/',
-    'getUninitiated',
-    ['section_id', 'scheme_id', 'term_id'],
+    ['sectionid', 'schemeid', 'termid'],
+    ['payload'],
   ),
 
   // Startup endpoint (with special response processing)

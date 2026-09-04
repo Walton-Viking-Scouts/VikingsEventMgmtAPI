@@ -808,25 +808,11 @@ app.get('/get-payment-schemes', osmController.getPaymentSchemes);
 app.get('/get-payment-schedule', osmController.getPaymentSchedule);
 
 /**
- * OSM: Payment schedule details proxy.
- * @tags OSM Finance
- * @route GET /get-payment-schedule-details
- */
-app.get('/get-payment-schedule-details', osmController.getPaymentScheduleDetails);
-
-/**
  * OSM: Member payment status proxy.
  * @tags OSM Finance
  * @route GET /get-payment-status
  */
 app.get('/get-payment-status', osmController.getPaymentStatus);
-
-/**
- * OSM: Uninitiated payments proxy.
- * @tags OSM Finance
- * @route GET /get-uninitiated-payments
- */
-app.get('/get-uninitiated-payments', osmController.getUninitiatedPayments);
 
 /**
  * OSM: Startup data proxy.

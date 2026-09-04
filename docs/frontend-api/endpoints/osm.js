@@ -272,13 +272,13 @@
  *   get:
  *     summary: Get online payment schemes (subscriptions) for a section
  *     description: |
- *       Lists the online payment schemes configured for a section. Subscription (subs) schemes appear here with their scheme_id, which the other finance endpoints require.
+ *       Lists the online payment schemes configured for a section. Subscription (subs) schemes appear here with their schemeid, which the other finance endpoints require.
  *
- *       Requires the `section:finance:read` OSM OAuth scope.
+ *       Proxies `ext/finances/onlinepayments/?action=getSchemes`. Requires the `section:finance:read` OSM OAuth scope and finance read permission on the section.
  *     tags: [OSM Finance]
  *     parameters:
  *       - in: query
- *         name: section_id
+ *         name: sectionid
  *         required: true
  *         schema:
  *           type: string
@@ -293,8 +293,19 @@
  *               allOf:
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
- *                   additionalProperties: true
- *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *                   properties:
+ *                     items:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           schemeid:
+ *                             type: string
+ *                             example: "60603"
+ *                           name:
+ *                             type: string
+ *                             example: "General Subscriptions"
+ *                         additionalProperties: true
  *       400:
  *         description: Missing required parameters
  *         content:
@@ -310,44 +321,44 @@
  *
  * /get-payment-schedule:
  *   get:
- *     summary: Get the payment schedule for a scheme
+ *     summary: Get scheme settings and the payment schedule for a scheme
  *     description: |
- *       Retrieves scheduled payments for a payment scheme, optionally filtered by term. Omit term_id or pass all=1 for the all-time schedule.
+ *       Retrieves the scheme's settings and its dated payments. Pass termid for one term's payments or allpayments=true for every payment ever scheduled.
  *
- *       Requires the `section:finance:read` OSM OAuth scope.
+ *       Proxies `ext/finances/onlinepayments/?action=getPaymentSchedule`. Requires the `section:finance:read` OSM OAuth scope.
  *     tags: [OSM Finance]
  *     parameters:
  *       - in: query
- *         name: section_id
+ *         name: sectionid
  *         required: true
  *         schema:
  *           type: string
  *         description: Section identifier
  *         example: "49097"
  *       - in: query
- *         name: scheme_id
+ *         name: schemeid
  *         required: true
  *         schema:
  *           type: string
  *         description: Online payment scheme identifier (from /get-payment-schemes)
- *         example: "12345"
+ *         example: "60603"
  *       - in: query
- *         name: term_id
+ *         name: termid
  *         required: false
  *         schema:
  *           type: string
  *         description: Term identifier
- *         example: "841318"
+ *         example: "965353"
  *       - in: query
- *         name: all
+ *         name: allpayments
  *         required: false
  *         schema:
  *           type: string
- *         description: Set to 1 for the all-time schedule (ignores term_id)
- *         example: "0"
+ *         description: Set to true for the all-time schedule
+ *         example: "true"
  *     responses:
  *       200:
- *         description: Successful response
+ *         description: Scheme settings plus a payments array (flags are the strings "0"/"1")
  *         content:
  *           application/json:
  *             schema:
@@ -355,61 +366,38 @@
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
  *                   additionalProperties: true
- *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
- *       400:
- *         description: Missing required parameters
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       429:
- *         $ref: '#/components/responses/RateLimited'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- *
- * /get-payment-schedule-details:
- *   get:
- *     summary: Get detailed payment schedule information
- *     description: |
- *       Retrieves detailed schedule information for a scheme and term, including member payment history.
- *
- *       Requires the `section:finance:read` OSM OAuth scope.
- *     tags: [OSM Finance]
- *     parameters:
- *       - in: query
- *         name: section_id
- *         required: true
- *         schema:
- *           type: string
- *         description: Section identifier
- *         example: "49097"
- *       - in: query
- *         name: scheme_id
- *         required: true
- *         schema:
- *           type: string
- *         description: Online payment scheme identifier (from /get-payment-schemes)
- *         example: "12345"
- *       - in: query
- *         name: term_id
- *         required: true
- *         schema:
- *           type: string
- *         description: Term identifier
- *         example: "841318"
- *     responses:
- *       200:
- *         description: Successful response
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/SuccessResponse'
- *                 - type: object
- *                   additionalProperties: true
- *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *                   properties:
+ *                     schemeid:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     archived:
+ *                       type: string
+ *                       example: "0"
+ *                     giftaid:
+ *                       type: string
+ *                       example: "1"
+ *                     defaulton:
+ *                       type: string
+ *                       description: "1" when every member is expected to pay
+ *                     payments:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           paymentid:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           date:
+ *                             type: string
+ *                             example: "2026-09-15"
+ *                           amount:
+ *                             type: string
+ *                             example: "45.00"
+ *                           archived:
+ *                             type: string
+ *                             example: "0"
  *       400:
  *         description: Missing required parameters
  *         content:
@@ -427,104 +415,69 @@
  *   get:
  *     summary: Get member payment status for a scheme and term
  *     description: |
- *       Retrieves the payment status (paid, pending, overdue) for every member in a scheme and term.
+ *       Retrieves each member's status for every payment in the scheme and term. Each item is one member; each payment appears under its paymentid as a JSON string holding a status history array. Status values seen: Payment required, Payment not required, Initiated, Paid, Received, Paid manually.
  *
- *       Requires the `section:finance:read` OSM OAuth scope.
+ *       Proxies `ext/finances/onlinepayments/?action=getPaymentStatus`. Requires the `section:finance:read` OSM OAuth scope.
  *     tags: [OSM Finance]
  *     parameters:
  *       - in: query
- *         name: section_id
+ *         name: sectionid
  *         required: true
  *         schema:
  *           type: string
  *         description: Section identifier
  *         example: "49097"
  *       - in: query
- *         name: scheme_id
+ *         name: schemeid
  *         required: true
  *         schema:
  *           type: string
  *         description: Online payment scheme identifier (from /get-payment-schemes)
- *         example: "12345"
+ *         example: "60603"
  *       - in: query
- *         name: term_id
+ *         name: termid
  *         required: true
  *         schema:
  *           type: string
  *         description: Term identifier
- *         example: "841318"
+ *         example: "965353"
  *       - in: query
- *         name: include_payload
+ *         name: payload
  *         required: false
  *         schema:
  *           type: string
- *         description: Include detailed payment data per member
- *         example: "true"
+ *         description: Set to 1 to request the detailed payload the OSM UI asks for
+ *         example: "1"
  *     responses:
  *       200:
- *         description: Successful response
+ *         description: Members with per-payment status strings
  *         content:
  *           application/json:
  *             schema:
  *               allOf:
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
- *                   additionalProperties: true
- *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
- *       400:
- *         description: Missing required parameters
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       429:
- *         $ref: '#/components/responses/RateLimited'
- *       500:
- *         $ref: '#/components/responses/InternalServerError'
- *
- * /get-uninitiated-payments:
- *   get:
- *     summary: Get members who have not initiated payment
- *     description: |
- *       Lists members who have not yet started the online payment process for a scheme and term.
- *
- *       Requires the `section:finance:read` OSM OAuth scope.
- *     tags: [OSM Finance]
- *     parameters:
- *       - in: query
- *         name: section_id
- *         required: true
- *         schema:
- *           type: string
- *         description: Section identifier
- *         example: "49097"
- *       - in: query
- *         name: scheme_id
- *         required: true
- *         schema:
- *           type: string
- *         description: Online payment scheme identifier (from /get-payment-schemes)
- *         example: "12345"
- *       - in: query
- *         name: term_id
- *         required: true
- *         schema:
- *           type: string
- *         description: Term identifier
- *         example: "841318"
- *     responses:
- *       200:
- *         description: Successful response
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/SuccessResponse'
- *                 - type: object
- *                   additionalProperties: true
- *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *                   properties:
+ *                     items:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         additionalProperties:
+ *                           type: string
+ *                           description: Keyed by paymentid; a JSON string of the form {"status":[{"statusid","status","statustimestamp","details","who","firstname"}]}
+ *                         properties:
+ *                           scoutid:
+ *                             type: string
+ *                           firstname:
+ *                             type: string
+ *                           lastname:
+ *                             type: string
+ *                           patrolid:
+ *                             type: string
+ *                           startdate:
+ *                             type: string
+ *                           directdebit:
+ *                             type: string
  *       400:
  *         description: Missing required parameters
  *         content:

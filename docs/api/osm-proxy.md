@@ -69,11 +69,9 @@ Rate limit information is included in all responses under `_rateLimitInfo`:
 | `/get-flexi-structure` | Get flexi record structure | `section_id` |
 | `/get-single-flexi-record` | Get single flexi record | `section_id`, `scout_id` |
 | `/get-startup-data` | Get user startup data | None |
-| `/get-payment-schemes` | Get online payment schemes (subscriptions) | `section_id` |
-| `/get-payment-schedule` | Get payment schedule for a scheme | `section_id`, `scheme_id` (optional `term_id`, `all`) |
-| `/get-payment-schedule-details` | Get payment schedule details with member history | `section_id`, `scheme_id`, `term_id` |
-| `/get-payment-status` | Get per-member payment status | `section_id`, `scheme_id`, `term_id` (optional `include_payload`) |
-| `/get-uninitiated-payments` | Get members who have not started paying | `section_id`, `scheme_id`, `term_id` |
+| `/get-payment-schemes` | Get online payment schemes (subscriptions) | `sectionid` |
+| `/get-payment-schedule` | Get scheme settings and payment schedule | `sectionid`, `schemeid` (optional `termid`, `allpayments`) |
+| `/get-payment-status` | Get per-member payment status | `sectionid`, `schemeid`, `termid` (optional `payload`) |
 
 ### Data Modification Endpoints (POST)
 
@@ -357,9 +355,14 @@ where subscription (subs) schemes live. They all require the
 `section:finance:read` OAuth scope, so the OSM app registration must grant that
 scope and users must re-authorise before these calls succeed.
 
-OSM does not publish this API, so the parameter names and response shapes below
-come from community documentation captured from the OSM web app. Confirm them
-against real responses when testing.
+OSM does not publish this API. The URLs and query names below match what the
+OSM web app itself sends (captured from its network requests) and what the
+`osm-extender/osm` Ruby gem and `hippysurfer/scout-records` use: every action
+sits on the same `ext/finances/onlinepayments/` URL and takes `sectionid`,
+`schemeid` and `termid`. OSM answers `405 {"error":{"message":"Invalid
+parameter"}}` to any other query name, so never guess at parameters here.
+The response shapes are those the community clients parse; confirm against a
+saved OSM response before relying on a field.
 
 Only the parameters listed for each endpoint are forwarded to OSM; any other
 query keys are dropped. Each forwarded value must be a single query-string
@@ -371,25 +374,27 @@ wrapped as `{ "items": [...] }`, and a bare scalar as `{ "value": ... }`, so
 the `_rateLimitInfo` field can always be attached without altering the data.
 
 The requested OAuth scope can be overridden per deployment with the
-`OSM_OAUTH_SCOPE` environment variable (see `config/osm.js`).
+`OSM_OAUTH_SCOPE` environment variable (see `config/osm.js`). The user also
+needs finance read permission on the section (`permissions.finance >= 10` in
+`/get-user-roles`); sections without it should not be queried.
 
 #### GET /get-payment-schemes
 
 Lists the payment schemes configured for a section. Use the returned
-`scheme_id` with the other finance endpoints.
+`schemeid` with the other finance endpoints.
 
-**Query Parameters:** `section_id` (required)
+**Query Parameters:** `sectionid` (required)
 
 ```bash
-curl "https://your-backend-api.com/get-payment-schemes?section_id=49097" \
+curl "https://your-backend-api.com/get-payment-schemes?sectionid=49097" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "schemes": [
-    { "scheme_id": 12345, "name": "Subscriptions 2025/26", "status": "active" }
+  "items": [
+    { "schemeid": "60603", "name": "General Subscriptions" }
   ],
   "_rateLimitInfo": { ... }
 }
@@ -397,52 +402,60 @@ curl "https://your-backend-api.com/get-payment-schemes?section_id=49097" \
 
 #### GET /get-payment-schedule
 
-Scheduled payments for a scheme, optionally filtered by term.
+Scheme settings plus its dated payments. Pass `termid` for one term's
+payments or `allpayments=true` for every payment ever scheduled.
 
-**Query Parameters:** `section_id`, `scheme_id` (required); `term_id`, `all` (optional, `all=1` returns the all-time schedule)
+**Query Parameters:** `sectionid`, `schemeid` (required); `termid`, `allpayments` (optional)
 
 **Response (200 OK):**
 ```json
 {
+  "schemeid": "60603",
+  "accountid": "1234",
+  "name": "General Subscriptions",
+  "description": "",
+  "archived": "0",
+  "giftaid": "1",
+  "defaulton": "1",
+  "paynow": "-1",
+  "preauth_amount": "100.00",
   "payments": [
-    { "date": "2025-10-01", "amount": 45.00, "description": "Autumn subs" }
+    { "paymentid": "123", "name": "Autumn 2026", "date": "2026-09-15", "amount": "45.00", "archived": "0" }
   ],
   "_rateLimitInfo": { ... }
 }
 ```
 
-#### GET /get-payment-schedule-details
-
-Detailed schedule information including member payment history. Response
-shape is not documented upstream and is passed through (arrays wrapped as
-`items`).
-
-**Query Parameters:** `section_id`, `scheme_id`, `term_id` (required)
+Flags are the strings `"0"` / `"1"`. `defaulton` means every member is expected
+to pay (the gem calls it `require_all`).
 
 #### GET /get-payment-status
 
-Per-member payment status for a scheme and term.
+Per-member payment status for a scheme and term. Each item is one member;
+each payment from the schedule appears under its `paymentid` as a JSON
+**string** containing a `status` history array (newest state is the one to
+show). Status values seen: `Payment required`, `Payment not required`,
+`Initiated`, `Paid`, `Received`, `Paid manually`.
 
-**Query Parameters:** `section_id`, `scheme_id`, `term_id` (required); `include_payload` (optional)
+**Query Parameters:** `sectionid`, `schemeid`, `termid` (required); `payload` (optional, the OSM UI sends `payload=1`)
 
 **Response (200 OK):**
 ```json
 {
-  "members": [
-    { "member_id": 555, "payment_status": "paid" },
-    { "member_id": 556, "payment_status": "overdue" }
+  "items": [
+    {
+      "scoutid": "555",
+      "firstname": "Ada",
+      "lastname": "L",
+      "patrolid": "1",
+      "startdate": "2026-09-01",
+      "directdebit": "Active",
+      "123": "{\"status\":[{\"statusid\":\"9\",\"status\":\"Paid\",\"statustimestamp\":\"15/09/2026 10:02\",\"details\":\"\",\"who\":\"1\",\"firstname\":\"Ada\"}]}"
+    }
   ],
   "_rateLimitInfo": { ... }
 }
 ```
-
-#### GET /get-uninitiated-payments
-
-Members who have not started the online payment process for a scheme and
-term. Response shape is not documented upstream and is passed through (arrays
-wrapped as `items`).
-
-**Query Parameters:** `section_id`, `scheme_id`, `term_id` (required)
 
 ## Error Responses
 
