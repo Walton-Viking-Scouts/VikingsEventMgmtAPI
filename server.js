@@ -34,6 +34,13 @@ const { osmHealthLogger } = require('./utils/osmHealthLogger');
 const { detectBlockedResponse } = require('./utils/responseHelpers');
 const osmCircuitBreaker = require('./utils/osmCircuitBreaker');
 
+/**
+ * OSM OAuth scopes requested at login. Every scope here must be enabled on the
+ * OSM app registration or OSM will reject the authorisation request.
+ * section:finance:read is required by the online payments (subscriptions) endpoints.
+ */
+const OSM_OAUTH_SCOPE = 'section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read';
+
 // Successfully loaded documentation
 console.log('✅ Frontend API docs loaded:', frontendApiDocs.specs.info.title, '(' + Object.keys(frontendApiDocs.specs.paths).length + ' endpoints)');
 // console.log('✅ OSM API docs loaded:', osmApiDocs.specs.info.title, '(' + Object.keys(osmApiDocs.specs.paths).length + ' endpoints)');
@@ -1017,7 +1024,8 @@ app.get('/oauth/debug', (req, res) => {
       !process.env.BACKEND_URL ? 'BACKEND_URL not set' : null,
       !process.env.FRONTEND_URL ? 'FRONTEND_URL not set' : null,
     ].filter(Boolean),
-    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aevent%3Awrite&response_type=code&state=debug`,
+    scope: OSM_OAUTH_SCOPE,
+    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID)}&redirect_uri=${encodeURIComponent(`${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`)}&scope=${encodeURIComponent(OSM_OAUTH_SCOPE)}&response_type=code&state=debug`,
   });
 });
 
@@ -1058,8 +1066,7 @@ app.get('/oauth/login', (req, res) => {
     stateParam += `&frontend_url=${encodeURIComponent(frontend_url)}`;
   }
   
-  // OAuth scope
-  const scope = 'section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read';
+  const scope = OSM_OAUTH_SCOPE;
   
   // Construct the OAuth authorization URL
   const authUrl = 'https://www.onlinescoutmanager.co.uk/oauth/authorize?' +

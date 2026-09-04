@@ -282,6 +282,24 @@ describe('Vikings OSM Backend API', () => {
       expect(response.body).toHaveProperty('environment');
     });
 
+    test('OAuth debug and login should request the same scope including finance read', async () => {
+      const expectedScope = 'section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read';
+
+      const debugResponse = await request(app)
+        .get('/oauth/debug')
+        .expect(200);
+
+      expect(debugResponse.body.scope).toBe(expectedScope);
+      expect(debugResponse.body.authUrl).toContain(`scope=${encodeURIComponent(expectedScope)}`);
+      expect(debugResponse.body.authUrl).not.toContain('section%3Aevent%3Awrite');
+
+      const loginResponse = await request(app)
+        .get('/oauth/login')
+        .expect(302);
+
+      expect(loginResponse.headers.location).toContain(`scope=${encodeURIComponent(expectedScope)}`);
+    });
+
     test('OAuth callback should handle missing authorization code', async () => {
       const response = await request(app)
         .get('/oauth/callback')
