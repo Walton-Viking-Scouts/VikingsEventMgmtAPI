@@ -2,6 +2,8 @@
  * Server utility functions to reduce redundancy in server.js
  */
 
+const { OSM_OAUTH_SCOPE, OSM_OAUTH_AUTHORIZE_URL } = require('../config/osm');
+
 /**
  * Conditional logging helper that reduces repetitive logging patterns
  * @param {boolean} enableLogging - Whether logging is enabled
@@ -74,7 +76,8 @@ const createOAuthDebugResponse = (req, getFrontendUrl) => {
     refererHeader: req.get('Referer') || 'Not set',
     nodeEnv: process.env.NODE_ENV || 'Not set',
     backendUrl: process.env.BACKEND_URL || 'Not set',
-    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aflexirecord%3Awrite&response_type=code`,
+    scope: OSM_OAUTH_SCOPE,
+    authUrl: `${OSM_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID || '')}&redirect_uri=${encodeURIComponent(`${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`)}&scope=${encodeURIComponent(OSM_OAUTH_SCOPE)}&response_type=code`,
   };
 };
 

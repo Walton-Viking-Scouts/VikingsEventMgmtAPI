@@ -385,8 +385,13 @@ const ONLINE_PAYMENTS_BASE = 'https://www.onlinescoutmanager.co.uk/ext/finances/
  * Creates a handler for an OSM online payments (subscriptions) endpoint.
  *
  * Only the named query parameters are forwarded to OSM, so callers cannot
- * inject arbitrary query keys into the finance API. Required parameters are
- * validated by createOSMApiHandler; optional ones are forwarded when present.
+ * inject arbitrary query keys into the finance API. Every forwarded value must
+ * be a single string from the query string; array/object values (repeated or
+ * bracketed keys) and body-supplied values are rejected with 400.
+ *
+ * OSM does not document these response shapes, so the response is normalised
+ * to always be a JSON object: a top-level array is wrapped as `{ items }` and
+ * a bare scalar as `{ value }`, so the rate-limit wrapper cannot mangle it.
  *
  * @param {string} endpoint - Endpoint name for logging
  * @param {string} path - Path segment under the online payments base URL ('' for the root)
@@ -396,6 +401,15 @@ const ONLINE_PAYMENTS_BASE = 'https://www.onlinescoutmanager.co.uk/ext/finances/
  * @returns {Function} Express request handler
  */
 const createOnlinePaymentsHandler = (endpoint, path, action, requiredParams, optionalParams = []) => {
+  const forwardedParams = [...requiredParams, ...optionalParams];
+
+  const validationError = (message) => {
+    const err = new Error(message);
+    err.status = 400;
+    err.code = 'VALIDATION_ERROR';
+    return err;
+  };
+
   return createOSMApiHandler(endpoint, {
     method: 'GET',
     requiredParams,
@@ -403,9 +417,22 @@ const createOnlinePaymentsHandler = (endpoint, path, action, requiredParams, opt
       const url = new URL(`${ONLINE_PAYMENTS_BASE}${path}`);
       url.searchParams.set('action', action);
 
-      [...requiredParams, ...optionalParams].forEach((param) => {
+      const invalid = forwardedParams.filter((param) => {
         const value = req.query[param];
-        if (value !== undefined && value !== '') {
+        return value !== undefined && typeof value !== 'string';
+      });
+      if (invalid.length > 0) {
+        throw validationError(`Parameter ${invalid.join(', ')} must be a single value`);
+      }
+
+      const missing = requiredParams.filter((param) => !req.query[param]);
+      if (missing.length > 0) {
+        throw validationError(`Missing required query parameters: ${missing.join(', ')}`);
+      }
+
+      forwardedParams.forEach((param) => {
+        const value = req.query[param];
+        if (value) {
           url.searchParams.set(param, value);
         }
       });
@@ -418,6 +445,15 @@ const createOnlinePaymentsHandler = (endpoint, path, action, requiredParams, opt
         'Authorization': `Bearer ${access_token}`,
       },
     }),
+    processResponse: (data, _req) => {
+      if (Array.isArray(data)) {
+        return { items: data };
+      }
+      if (data === null || typeof data !== 'object') {
+        return { value: data };
+      }
+      return data;
+    },
   });
 };
 

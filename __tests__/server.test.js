@@ -245,6 +245,76 @@ describe('Vikings OSM Backend API', () => {
         const [url] = fetch.mock.calls[0];
         expect(url).toBe('https://www.onlinescoutmanager.co.uk/ext/finances/onlinepayments/uninitiated/?action=getUninitiated&section_id=49097&scheme_id=77&term_id=841318');
       });
+
+      test('should reject array-valued query params instead of forwarding them to OSM', async () => {
+        const response = await request(app)
+          .get('/get-payment-schemes?section_id=49097&section_id=1')
+          .set('Authorization', 'Bearer test_token')
+          .expect(400);
+
+        expect(response.body.error).toBe('Bad Request');
+        expect(response.body.details).toContain('section_id must be a single value');
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      test('should reject object-valued optional params', async () => {
+        const response = await request(app)
+          .get('/get-payment-schedule?section_id=49097&scheme_id=77&term_id[x]=1')
+          .set('Authorization', 'Bearer test_token')
+          .expect(400);
+
+        expect(response.body.error).toBe('Bad Request');
+        expect(response.body.details).toContain('term_id must be a single value');
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      test('should not accept required params from the request body', async () => {
+        const response = await request(app)
+          .get('/get-payment-status')
+          .set('Authorization', 'Bearer test_token')
+          .send({ section_id: '49097', scheme_id: '77', term_id: '841318' })
+          .expect(400);
+
+        expect(response.body.error).toBe('Bad Request');
+        expect(response.body.details).toBe('Missing required query parameters: section_id, scheme_id, term_id');
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      test('should wrap a top-level array response as items', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve(JSON.stringify([{ member_id: 1 }, { member_id: 2 }])),
+        });
+
+        const response = await request(app)
+          .get('/get-uninitiated-payments')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097', scheme_id: '77', term_id: '841318' })
+          .expect(200);
+
+        expect(response.body.items).toEqual([{ member_id: 1 }, { member_id: 2 }]);
+        expect(response.body).toHaveProperty('_rateLimitInfo');
+        expect(response.body).not.toHaveProperty('0');
+      });
+
+      test('should wrap a bare scalar response as value', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve('false'),
+        });
+
+        const response = await request(app)
+          .get('/get-payment-schemes')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097' })
+          .expect(200);
+
+        expect(response.body.value).toBe(false);
+      });
     });
 
     test('GET /get-flexi-structure should require access token, sectionid, and flexirecordid', async () => {

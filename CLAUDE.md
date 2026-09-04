@@ -263,7 +263,10 @@ NODE_ENV=development|production|test
 PORT=3000
 SENTRY_DSN=optional_sentry_dsn
 BACKEND_URL=backend_base_url
+OSM_OAUTH_SCOPE=optional_override_of_requested_osm_scopes
 ```
+
+`OSM_OAUTH_SCOPE` defaults to the scope list in `config/osm.js` (which includes `section:finance:read`). Set it only to temporarily request a narrower set, for example while the OSM app registration does not yet grant a newly added scope.
 
 ### Testing Approach
 

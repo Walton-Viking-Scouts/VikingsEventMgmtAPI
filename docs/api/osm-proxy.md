@@ -362,7 +362,16 @@ come from community documentation captured from the OSM web app. Confirm them
 against real responses when testing.
 
 Only the parameters listed for each endpoint are forwarded to OSM; any other
-query keys are dropped.
+query keys are dropped. Each forwarded value must be a single query-string
+value: repeated or bracketed keys (which parse as arrays/objects) and values
+supplied in a request body are rejected with `400`.
+
+Responses are always JSON objects. If OSM returns a top-level array it is
+wrapped as `{ "items": [...] }`, and a bare scalar as `{ "value": ... }`, so
+the `_rateLimitInfo` field can always be attached without altering the data.
+
+The requested OAuth scope can be overridden per deployment with the
+`OSM_OAUTH_SCOPE` environment variable (see `config/osm.js`).
 
 #### GET /get-payment-schemes
 
@@ -405,7 +414,8 @@ Scheduled payments for a scheme, optionally filtered by term.
 #### GET /get-payment-schedule-details
 
 Detailed schedule information including member payment history. Response
-shape is not documented upstream and is returned as-is.
+shape is not documented upstream and is passed through (arrays wrapped as
+`items`).
 
 **Query Parameters:** `section_id`, `scheme_id`, `term_id` (required)
 
@@ -429,7 +439,8 @@ Per-member payment status for a scheme and term.
 #### GET /get-uninitiated-payments
 
 Members who have not started the online payment process for a scheme and
-term. Response shape is not documented upstream and is returned as-is.
+term. Response shape is not documented upstream and is passed through (arrays
+wrapped as `items`).
 
 **Query Parameters:** `section_id`, `scheme_id`, `term_id` (required)
 

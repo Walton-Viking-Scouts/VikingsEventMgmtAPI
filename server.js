@@ -33,13 +33,7 @@ const {
 const { osmHealthLogger } = require('./utils/osmHealthLogger');
 const { detectBlockedResponse } = require('./utils/responseHelpers');
 const osmCircuitBreaker = require('./utils/osmCircuitBreaker');
-
-/**
- * OSM OAuth scopes requested at login. Every scope here must be enabled on the
- * OSM app registration or OSM will reject the authorisation request.
- * section:finance:read is required by the online payments (subscriptions) endpoints.
- */
-const OSM_OAUTH_SCOPE = 'section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read';
+const { OSM_OAUTH_SCOPE, OSM_OAUTH_AUTHORIZE_URL } = require('./config/osm');
 
 // Successfully loaded documentation
 console.log('✅ Frontend API docs loaded:', frontendApiDocs.specs.info.title, '(' + Object.keys(frontendApiDocs.specs.paths).length + ' endpoints)');
@@ -1025,7 +1019,7 @@ app.get('/oauth/debug', (req, res) => {
       !process.env.FRONTEND_URL ? 'FRONTEND_URL not set' : null,
     ].filter(Boolean),
     scope: OSM_OAUTH_SCOPE,
-    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID)}&redirect_uri=${encodeURIComponent(`${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`)}&scope=${encodeURIComponent(OSM_OAUTH_SCOPE)}&response_type=code&state=debug`,
+    authUrl: `${OSM_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID || '')}&redirect_uri=${encodeURIComponent(`${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`)}&scope=${encodeURIComponent(OSM_OAUTH_SCOPE)}&response_type=code&state=debug`,
   });
 });
 
@@ -1069,7 +1063,7 @@ app.get('/oauth/login', (req, res) => {
   const scope = OSM_OAUTH_SCOPE;
   
   // Construct the OAuth authorization URL
-  const authUrl = 'https://www.onlinescoutmanager.co.uk/oauth/authorize?' +
+  const authUrl = `${OSM_OAUTH_AUTHORIZE_URL}?` +
     `client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `state=${encodeURIComponent(stateParam)}&` +

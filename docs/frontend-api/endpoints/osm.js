@@ -293,21 +293,8 @@
  *               allOf:
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
- *                   properties:
- *                     schemes:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           scheme_id:
- *                             type: integer
- *                             example: 12345
- *                           name:
- *                             type: string
- *                             example: "Subscriptions 2025/26"
- *                           status:
- *                             type: string
- *                             example: "active"
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
  *       400:
  *         description: Missing required parameters
  *         content:
@@ -367,22 +354,8 @@
  *               allOf:
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
- *                   properties:
- *                     payments:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           date:
- *                             type: string
- *                             format: date
- *                             example: "2025-10-01"
- *                           amount:
- *                             type: number
- *                             example: 45.00
- *                           description:
- *                             type: string
- *                             example: "Autumn subs"
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
  *       400:
  *         description: Missing required parameters
  *         content:
@@ -435,7 +408,8 @@
  *               allOf:
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
- *                   description: Raw OSM response (shape not formally documented by OSM)
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
  *       400:
  *         description: Missing required parameters
  *         content:
@@ -495,18 +469,8 @@
  *               allOf:
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
- *                   properties:
- *                     members:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           member_id:
- *                             type: integer
- *                             example: 555
- *                           payment_status:
- *                             type: string
- *                             enum: [paid, pending, overdue]
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
  *       400:
  *         description: Missing required parameters
  *         content:
@@ -559,7 +523,8 @@
  *               allOf:
  *                 - $ref: '#/components/schemas/SuccessResponse'
  *                 - type: object
- *                   description: Raw OSM response (shape not formally documented by OSM)
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
  *       400:
  *         description: Missing required parameters
  *         content:
