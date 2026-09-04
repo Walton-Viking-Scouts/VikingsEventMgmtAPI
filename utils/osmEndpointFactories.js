@@ -377,6 +377,51 @@ const createFlexiUpdateHandler = (endpoint, baseUrl, requiredParams, customValid
 };
 
 /**
+ * Base URL for OSM's online payments (subscriptions) API family.
+ */
+const ONLINE_PAYMENTS_BASE = 'https://www.onlinescoutmanager.co.uk/ext/finances/onlinepayments/';
+
+/**
+ * Creates a handler for an OSM online payments (subscriptions) endpoint.
+ *
+ * Only the named query parameters are forwarded to OSM, so callers cannot
+ * inject arbitrary query keys into the finance API. Required parameters are
+ * validated by createOSMApiHandler; optional ones are forwarded when present.
+ *
+ * @param {string} endpoint - Endpoint name for logging
+ * @param {string} path - Path segment under the online payments base URL ('' for the root)
+ * @param {string} action - OSM `action` query value
+ * @param {Array<string>} requiredParams - Required query parameters
+ * @param {Array<string>} [optionalParams] - Optional query parameters forwarded when present
+ * @returns {Function} Express request handler
+ */
+const createOnlinePaymentsHandler = (endpoint, path, action, requiredParams, optionalParams = []) => {
+  return createOSMApiHandler(endpoint, {
+    method: 'GET',
+    requiredParams,
+    buildUrl: (req) => {
+      const url = new URL(`${ONLINE_PAYMENTS_BASE}${path}`);
+      url.searchParams.set('action', action);
+
+      [...requiredParams, ...optionalParams].forEach((param) => {
+        const value = req.query[param];
+        if (value !== undefined && value !== '') {
+          url.searchParams.set(param, value);
+        }
+      });
+
+      return url.toString();
+    },
+    buildRequestOptions: (_req, access_token) => ({
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+      },
+    }),
+  });
+};
+
+/**
  * Pre-configured endpoint handlers for common OSM APIs
  */
 const osmEndpoints = {
@@ -554,6 +599,44 @@ const osmEndpoints = {
     ['eventid', 'sectionid'],
   ),
 
+  // Online payments / subscriptions endpoints (require section:finance:read scope)
+  getPaymentSchemes: () => createOnlinePaymentsHandler(
+    'getPaymentSchemes',
+    '',
+    'getSchemes',
+    ['section_id'],
+  ),
+
+  getPaymentSchedule: () => createOnlinePaymentsHandler(
+    'getPaymentSchedule',
+    'schedule/',
+    'getPaymentSchedule',
+    ['section_id', 'scheme_id'],
+    ['term_id', 'all'],
+  ),
+
+  getPaymentScheduleDetails: () => createOnlinePaymentsHandler(
+    'getPaymentScheduleDetails',
+    'details/',
+    'getDetails',
+    ['section_id', 'scheme_id', 'term_id'],
+  ),
+
+  getPaymentStatus: () => createOnlinePaymentsHandler(
+    'getPaymentStatus',
+    'status/',
+    'getPaymentStatus',
+    ['section_id', 'scheme_id', 'term_id'],
+    ['include_payload'],
+  ),
+
+  getUninitiatedPayments: () => createOnlinePaymentsHandler(
+    'getUninitiatedPayments',
+    'uninitiated/',
+    'getUninitiated',
+    ['section_id', 'scheme_id', 'term_id'],
+  ),
+
   // Startup endpoint (with special response processing)
   getStartupData: () => createStartupHandler(
     'getStartupData',
@@ -568,5 +651,6 @@ module.exports = {
   createContactHandler,
   createStartupHandler,
   createFlexiUpdateHandler,
+  createOnlinePaymentsHandler,
   osmEndpoints,
 };

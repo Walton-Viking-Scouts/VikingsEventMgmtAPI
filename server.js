@@ -793,6 +793,41 @@ app.post('/create-flexi-record', osmController.createFlexiRecord);
 app.post('/add-flexi-column', osmController.addFlexiColumn);
 
 /**
+ * OSM: Online payment schemes (subscriptions) proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-schemes
+ */
+app.get('/get-payment-schemes', osmController.getPaymentSchemes);
+
+/**
+ * OSM: Payment schedule proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-schedule
+ */
+app.get('/get-payment-schedule', osmController.getPaymentSchedule);
+
+/**
+ * OSM: Payment schedule details proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-schedule-details
+ */
+app.get('/get-payment-schedule-details', osmController.getPaymentScheduleDetails);
+
+/**
+ * OSM: Member payment status proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-status
+ */
+app.get('/get-payment-status', osmController.getPaymentStatus);
+
+/**
+ * OSM: Uninitiated payments proxy.
+ * @tags OSM Finance
+ * @route GET /get-uninitiated-payments
+ */
+app.get('/get-uninitiated-payments', osmController.getUninitiatedPayments);
+
+/**
  * OSM: Startup data proxy.
  * @tags OSM
  * @route GET /get-startup-data
@@ -1024,7 +1059,7 @@ app.get('/oauth/login', (req, res) => {
   }
   
   // OAuth scope
-  const scope = 'section:member:read section:programme:read section:event:read section:flexirecord:write';
+  const scope = 'section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read';
   
   // Construct the OAuth authorization URL
   const authUrl = 'https://www.onlinescoutmanager.co.uk/oauth/authorize?' +

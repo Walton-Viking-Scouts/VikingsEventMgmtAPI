@@ -314,6 +314,99 @@ const getEventSharingStatus = osmEndpoints.getEventSharingStatus();
 const getSharedEventAttendance = osmEndpoints.getSharedEventAttendance();
 
 /**
+ * OSM: Get online payment schemes (subscriptions) for a section.
+ *
+ * Proxies `ext/finances/onlinepayments/?action=getSchemes`. Requires the
+ * `section:finance:read` OAuth scope.
+ *
+ * @tags OSM Finance
+ * @route GET /get-payment-schemes
+ * @header Authorization {string}
+ * @param {string|number} query.section_id - Section id
+ * @returns {object} 200 - Payment schemes configured for the section
+ * @example Success response
+ * { "schemes": [ { "scheme_id": 12345, "name": "Subscriptions 2025/26", "status": "active" } ] }
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: section_id" }
+ */
+const getPaymentSchemes = osmEndpoints.getPaymentSchemes();
+
+/**
+ * OSM: Get the payment schedule for a scheme.
+ *
+ * Proxies `ext/finances/onlinepayments/schedule/?action=getPaymentSchedule`.
+ * Omit `term_id` (or pass `all=1`) for the all-time schedule.
+ *
+ * @tags OSM Finance
+ * @route GET /get-payment-schedule
+ * @header Authorization {string}
+ * @param {string|number} query.section_id - Section id
+ * @param {string|number} query.scheme_id - Payment scheme id
+ * @param {string|number} [query.term_id] - Term id (optional)
+ * @param {string|number} [query.all] - Set to 1 for the all-time schedule
+ * @returns {object} 200 - Scheduled payments for the scheme
+ * @example Success response
+ * { "payments": [ { "date": "2025-10-01", "amount": 45.00, "description": "Autumn subs" } ] }
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: section_id, scheme_id" }
+ */
+const getPaymentSchedule = osmEndpoints.getPaymentSchedule();
+
+/**
+ * OSM: Get detailed payment schedule information including member payment history.
+ *
+ * Proxies `ext/finances/onlinepayments/details/?action=getDetails`.
+ *
+ * @tags OSM Finance
+ * @route GET /get-payment-schedule-details
+ * @header Authorization {string}
+ * @param {string|number} query.section_id - Section id
+ * @param {string|number} query.scheme_id - Payment scheme id
+ * @param {string|number} query.term_id - Term id
+ * @returns {object} 200 - Schedule details
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: section_id, scheme_id, term_id" }
+ */
+const getPaymentScheduleDetails = osmEndpoints.getPaymentScheduleDetails();
+
+/**
+ * OSM: Get per-member payment status for a scheme and term.
+ *
+ * Proxies `ext/finances/onlinepayments/status/?action=getPaymentStatus`.
+ *
+ * @tags OSM Finance
+ * @route GET /get-payment-status
+ * @header Authorization {string}
+ * @param {string|number} query.section_id - Section id
+ * @param {string|number} query.scheme_id - Payment scheme id
+ * @param {string|number} query.term_id - Term id
+ * @param {boolean} [query.include_payload] - Include detailed payment data
+ * @returns {object} 200 - Member payment status
+ * @example Success response
+ * { "members": [ { "member_id": 555, "payment_status": "paid" }, { "member_id": 556, "payment_status": "overdue" } ] }
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: section_id, scheme_id, term_id" }
+ */
+const getPaymentStatus = osmEndpoints.getPaymentStatus();
+
+/**
+ * OSM: Get members who have not started paying for a scheme and term.
+ *
+ * Proxies `ext/finances/onlinepayments/uninitiated/?action=getUninitiated`.
+ *
+ * @tags OSM Finance
+ * @route GET /get-uninitiated-payments
+ * @header Authorization {string}
+ * @param {string|number} query.section_id - Section id
+ * @param {string|number} query.scheme_id - Payment scheme id
+ * @param {string|number} query.term_id - Term id
+ * @returns {object} 200 - Members who have not initiated payment
+ * @example Error response (missing params)
+ * { "error": "Missing required parameters: section_id, scheme_id, term_id" }
+ */
+const getUninitiatedPayments = osmEndpoints.getUninitiatedPayments();
+
+/**
  * OSM: Update a single FlexiRecord field for one member.
  *
  * value can be an empty string to clear a field. `columnid` must match pattern `f_<number>`.
@@ -638,6 +731,13 @@ module.exports = {
 
   // Programme
   getProgrammeSummary,
+
+  // Online payments / subscriptions
+  getPaymentSchemes,
+  getPaymentSchedule,
+  getPaymentScheduleDetails,
+  getPaymentStatus,
+  getUninitiatedPayments,
 
   // Members and Contacts
   getContactDetails,
