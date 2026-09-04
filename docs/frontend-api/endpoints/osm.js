@@ -268,6 +268,276 @@
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  * 
+ * /get-payment-schemes:
+ *   get:
+ *     summary: Get online payment schemes (subscriptions) for a section
+ *     description: |
+ *       Lists the online payment schemes configured for a section. Subscription (subs) schemes appear here with their scheme_id, which the other finance endpoints require.
+ *
+ *       Requires the `section:finance:read` OSM OAuth scope.
+ *     tags: [OSM Finance]
+ *     parameters:
+ *       - in: query
+ *         name: section_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Section identifier
+ *         example: "49097"
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *       400:
+ *         description: Missing required parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *
+ * /get-payment-schedule:
+ *   get:
+ *     summary: Get the payment schedule for a scheme
+ *     description: |
+ *       Retrieves scheduled payments for a payment scheme, optionally filtered by term. Omit term_id or pass all=1 for the all-time schedule.
+ *
+ *       Requires the `section:finance:read` OSM OAuth scope.
+ *     tags: [OSM Finance]
+ *     parameters:
+ *       - in: query
+ *         name: section_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Section identifier
+ *         example: "49097"
+ *       - in: query
+ *         name: scheme_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Online payment scheme identifier (from /get-payment-schemes)
+ *         example: "12345"
+ *       - in: query
+ *         name: term_id
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Term identifier
+ *         example: "841318"
+ *       - in: query
+ *         name: all
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Set to 1 for the all-time schedule (ignores term_id)
+ *         example: "0"
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *       400:
+ *         description: Missing required parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *
+ * /get-payment-schedule-details:
+ *   get:
+ *     summary: Get detailed payment schedule information
+ *     description: |
+ *       Retrieves detailed schedule information for a scheme and term, including member payment history.
+ *
+ *       Requires the `section:finance:read` OSM OAuth scope.
+ *     tags: [OSM Finance]
+ *     parameters:
+ *       - in: query
+ *         name: section_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Section identifier
+ *         example: "49097"
+ *       - in: query
+ *         name: scheme_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Online payment scheme identifier (from /get-payment-schemes)
+ *         example: "12345"
+ *       - in: query
+ *         name: term_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Term identifier
+ *         example: "841318"
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *       400:
+ *         description: Missing required parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *
+ * /get-payment-status:
+ *   get:
+ *     summary: Get member payment status for a scheme and term
+ *     description: |
+ *       Retrieves the payment status (paid, pending, overdue) for every member in a scheme and term.
+ *
+ *       Requires the `section:finance:read` OSM OAuth scope.
+ *     tags: [OSM Finance]
+ *     parameters:
+ *       - in: query
+ *         name: section_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Section identifier
+ *         example: "49097"
+ *       - in: query
+ *         name: scheme_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Online payment scheme identifier (from /get-payment-schemes)
+ *         example: "12345"
+ *       - in: query
+ *         name: term_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Term identifier
+ *         example: "841318"
+ *       - in: query
+ *         name: include_payload
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Include detailed payment data per member
+ *         example: "true"
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *       400:
+ *         description: Missing required parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *
+ * /get-uninitiated-payments:
+ *   get:
+ *     summary: Get members who have not initiated payment
+ *     description: |
+ *       Lists members who have not yet started the online payment process for a scheme and term.
+ *
+ *       Requires the `section:finance:read` OSM OAuth scope.
+ *     tags: [OSM Finance]
+ *     parameters:
+ *       - in: query
+ *         name: section_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Section identifier
+ *         example: "49097"
+ *       - in: query
+ *         name: scheme_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Online payment scheme identifier (from /get-payment-schemes)
+ *         example: "12345"
+ *       - in: query
+ *         name: term_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Term identifier
+ *         example: "841318"
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   additionalProperties: true
+ *                   description: Raw OSM response passed through (shape not formally documented by OSM; a top-level array is wrapped as `items`)
+ *       400:
+ *         description: Missing required parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ *
  * /get-startup-data:
  *   get:
  *     summary: Get user startup data

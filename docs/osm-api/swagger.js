@@ -100,6 +100,7 @@ const options = {
             - \`section:programme:read\` - Read programme/events  
             - \`section:event:read\` - Read event details
             - \`section:flexirecord:write\` - Read/write flexible records
+            - \`section:finance:read\` - Read online payments / subscriptions and invoices
           `,
         },
       },

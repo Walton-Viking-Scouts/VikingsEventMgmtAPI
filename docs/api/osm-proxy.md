@@ -69,6 +69,11 @@ Rate limit information is included in all responses under `_rateLimitInfo`:
 | `/get-flexi-structure` | Get flexi record structure | `section_id` |
 | `/get-single-flexi-record` | Get single flexi record | `section_id`, `scout_id` |
 | `/get-startup-data` | Get user startup data | None |
+| `/get-payment-schemes` | Get online payment schemes (subscriptions) | `section_id` |
+| `/get-payment-schedule` | Get payment schedule for a scheme | `section_id`, `scheme_id` (optional `term_id`, `all`) |
+| `/get-payment-schedule-details` | Get payment schedule details with member history | `section_id`, `scheme_id`, `term_id` |
+| `/get-payment-status` | Get per-member payment status | `section_id`, `scheme_id`, `term_id` (optional `include_payload`) |
+| `/get-uninitiated-payments` | Get members who have not started paying | `section_id`, `scheme_id`, `term_id` |
 
 ### Data Modification Endpoints (POST)
 
@@ -344,6 +349,100 @@ Get members data in grid format (requires POST due to complex parameters).
   "_rateLimitInfo": { ... }
 }
 ```
+
+### Online Payments / Subscriptions (GET)
+
+These endpoints proxy OSM's `ext/finances/onlinepayments/` API family, which is
+where subscription (subs) schemes live. They all require the
+`section:finance:read` OAuth scope, so the OSM app registration must grant that
+scope and users must re-authorise before these calls succeed.
+
+OSM does not publish this API, so the parameter names and response shapes below
+come from community documentation captured from the OSM web app. Confirm them
+against real responses when testing.
+
+Only the parameters listed for each endpoint are forwarded to OSM; any other
+query keys are dropped. Each forwarded value must be a single query-string
+value: repeated or bracketed keys (which parse as arrays/objects) and values
+supplied in a request body are rejected with `400`.
+
+Responses are always JSON objects. If OSM returns a top-level array it is
+wrapped as `{ "items": [...] }`, and a bare scalar as `{ "value": ... }`, so
+the `_rateLimitInfo` field can always be attached without altering the data.
+
+The requested OAuth scope can be overridden per deployment with the
+`OSM_OAUTH_SCOPE` environment variable (see `config/osm.js`).
+
+#### GET /get-payment-schemes
+
+Lists the payment schemes configured for a section. Use the returned
+`scheme_id` with the other finance endpoints.
+
+**Query Parameters:** `section_id` (required)
+
+```bash
+curl "https://your-backend-api.com/get-payment-schemes?section_id=49097" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response (200 OK):**
+```json
+{
+  "schemes": [
+    { "scheme_id": 12345, "name": "Subscriptions 2025/26", "status": "active" }
+  ],
+  "_rateLimitInfo": { ... }
+}
+```
+
+#### GET /get-payment-schedule
+
+Scheduled payments for a scheme, optionally filtered by term.
+
+**Query Parameters:** `section_id`, `scheme_id` (required); `term_id`, `all` (optional, `all=1` returns the all-time schedule)
+
+**Response (200 OK):**
+```json
+{
+  "payments": [
+    { "date": "2025-10-01", "amount": 45.00, "description": "Autumn subs" }
+  ],
+  "_rateLimitInfo": { ... }
+}
+```
+
+#### GET /get-payment-schedule-details
+
+Detailed schedule information including member payment history. Response
+shape is not documented upstream and is passed through (arrays wrapped as
+`items`).
+
+**Query Parameters:** `section_id`, `scheme_id`, `term_id` (required)
+
+#### GET /get-payment-status
+
+Per-member payment status for a scheme and term.
+
+**Query Parameters:** `section_id`, `scheme_id`, `term_id` (required); `include_payload` (optional)
+
+**Response (200 OK):**
+```json
+{
+  "members": [
+    { "member_id": 555, "payment_status": "paid" },
+    { "member_id": 556, "payment_status": "overdue" }
+  ],
+  "_rateLimitInfo": { ... }
+}
+```
+
+#### GET /get-uninitiated-payments
+
+Members who have not started the online payment process for a scheme and
+term. Response shape is not documented upstream and is passed through (arrays
+wrapped as `items`).
+
+**Query Parameters:** `section_id`, `scheme_id`, `term_id` (required)
 
 ## Error Responses
 

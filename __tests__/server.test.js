@@ -141,6 +141,182 @@ describe('Vikings OSM Backend API', () => {
       expect(response2.body.error).toContain('termid');
     });
 
+    describe('Online payments (subscriptions) endpoints', () => {
+      const financeEndpoints = [
+        { path: '/get-payment-schemes', required: ['section_id'] },
+        { path: '/get-payment-schedule', required: ['section_id', 'scheme_id'] },
+        { path: '/get-payment-schedule-details', required: ['section_id', 'scheme_id', 'term_id'] },
+        { path: '/get-payment-status', required: ['section_id', 'scheme_id', 'term_id'] },
+        { path: '/get-uninitiated-payments', required: ['section_id', 'scheme_id', 'term_id'] },
+      ];
+
+      financeEndpoints.forEach(({ path, required }) => {
+        test(`GET ${path} should require access token and ${required.join(', ')}`, async () => {
+          const response1 = await request(app)
+            .get(path)
+            .query({})
+            .expect(401);
+
+          expect(response1.body.error).toContain('Access token is required');
+
+          const response2 = await request(app)
+            .get(path)
+            .set('Authorization', 'Bearer test_token')
+            .query({})
+            .expect(400);
+
+          expect(response2.body.error).toBe(`Missing required parameters: ${required.join(', ')}`);
+          expect(fetch).not.toHaveBeenCalled();
+        });
+      });
+
+      test('GET /get-payment-schemes should proxy to the OSM online payments API', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve(JSON.stringify({ schemes: [{ scheme_id: 1, name: 'Subs' }] })),
+        });
+
+        const response = await request(app)
+          .get('/get-payment-schemes')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097' })
+          .expect(200);
+
+        expect(response.body.schemes).toEqual([{ scheme_id: 1, name: 'Subs' }]);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe('https://www.onlinescoutmanager.co.uk/ext/finances/onlinepayments/?action=getSchemes&section_id=49097');
+        expect(options.method).toBe('GET');
+        expect(options.headers.Authorization).toBe('Bearer test_token');
+      });
+
+      test('GET /get-payment-schedule should forward optional term_id and all params only', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve(JSON.stringify({ payments: [] })),
+        });
+
+        await request(app)
+          .get('/get-payment-schedule')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097', scheme_id: '77', term_id: '841318', all: '0', unexpected: 'x' })
+          .expect(200);
+
+        const [url] = fetch.mock.calls[0];
+        expect(url).toBe('https://www.onlinescoutmanager.co.uk/ext/finances/onlinepayments/schedule/?action=getPaymentSchedule&section_id=49097&scheme_id=77&term_id=841318&all=0');
+      });
+
+      test('GET /get-payment-status should forward include_payload', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve(JSON.stringify({ members: [] })),
+        });
+
+        await request(app)
+          .get('/get-payment-status')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097', scheme_id: '77', term_id: '841318', include_payload: 'true' })
+          .expect(200);
+
+        const [url] = fetch.mock.calls[0];
+        expect(url).toBe('https://www.onlinescoutmanager.co.uk/ext/finances/onlinepayments/status/?action=getPaymentStatus&section_id=49097&scheme_id=77&term_id=841318&include_payload=true');
+      });
+
+      test('GET /get-uninitiated-payments should map to the getUninitiated action', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve(JSON.stringify({ items: [] })),
+        });
+
+        await request(app)
+          .get('/get-uninitiated-payments')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097', scheme_id: '77', term_id: '841318' })
+          .expect(200);
+
+        const [url] = fetch.mock.calls[0];
+        expect(url).toBe('https://www.onlinescoutmanager.co.uk/ext/finances/onlinepayments/uninitiated/?action=getUninitiated&section_id=49097&scheme_id=77&term_id=841318');
+      });
+
+      test('should reject array-valued query params instead of forwarding them to OSM', async () => {
+        const response = await request(app)
+          .get('/get-payment-schemes?section_id=49097&section_id=1')
+          .set('Authorization', 'Bearer test_token')
+          .expect(400);
+
+        expect(response.body.error).toBe('Bad Request');
+        expect(response.body.details).toContain('section_id must be a single value');
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      test('should reject object-valued optional params', async () => {
+        const response = await request(app)
+          .get('/get-payment-schedule?section_id=49097&scheme_id=77&term_id[x]=1')
+          .set('Authorization', 'Bearer test_token')
+          .expect(400);
+
+        expect(response.body.error).toBe('Bad Request');
+        expect(response.body.details).toContain('term_id must be a single value');
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      test('should not accept required params from the request body', async () => {
+        const response = await request(app)
+          .get('/get-payment-status')
+          .set('Authorization', 'Bearer test_token')
+          .send({ section_id: '49097', scheme_id: '77', term_id: '841318' })
+          .expect(400);
+
+        expect(response.body.error).toBe('Bad Request');
+        expect(response.body.details).toBe('Missing required query parameters: section_id, scheme_id, term_id');
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      test('should wrap a top-level array response as items', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve(JSON.stringify([{ member_id: 1 }, { member_id: 2 }])),
+        });
+
+        const response = await request(app)
+          .get('/get-uninitiated-payments')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097', scheme_id: '77', term_id: '841318' })
+          .expect(200);
+
+        expect(response.body.items).toEqual([{ member_id: 1 }, { member_id: 2 }]);
+        expect(response.body).toHaveProperty('_rateLimitInfo');
+        expect(response.body).not.toHaveProperty('0');
+      });
+
+      test('should wrap a bare scalar response as value', async () => {
+        fetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: { get: jest.fn(() => null) },
+          text: () => Promise.resolve('false'),
+        });
+
+        const response = await request(app)
+          .get('/get-payment-schemes')
+          .set('Authorization', 'Bearer test_token')
+          .query({ section_id: '49097' })
+          .expect(200);
+
+        expect(response.body.value).toBe(false);
+      });
+    });
+
     test('GET /get-flexi-structure should require access token, sectionid, and flexirecordid', async () => {
       // First test without authorization token - should get 401
       const response1 = await request(app)
@@ -174,6 +350,24 @@ describe('Vikings OSM Backend API', () => {
       expect(response.body).toHaveProperty('runtime');
       expect(response.body).toHaveProperty('tokenStorage');
       expect(response.body).toHaveProperty('environment');
+    });
+
+    test('OAuth debug and login should request the same scope including finance read', async () => {
+      const expectedScope = 'section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read';
+
+      const debugResponse = await request(app)
+        .get('/oauth/debug')
+        .expect(200);
+
+      expect(debugResponse.body.scope).toBe(expectedScope);
+      expect(debugResponse.body.authUrl).toContain(`scope=${encodeURIComponent(expectedScope)}`);
+      expect(debugResponse.body.authUrl).not.toContain('section%3Aevent%3Awrite');
+
+      const loginResponse = await request(app)
+        .get('/oauth/login')
+        .expect(302);
+
+      expect(loginResponse.headers.location).toContain(`scope=${encodeURIComponent(expectedScope)}`);
     });
 
     test('OAuth callback should handle missing authorization code', async () => {

@@ -25,7 +25,7 @@ const oauthConfig = {
   clientId: process.env.OAUTH_CLIENT_ID,
   clientSecret: process.env.OAUTH_CLIENT_SECRET, // Never exposed to client
   redirectUri: `${process.env.BACKEND_URL}/oauth/callback`,
-  scope: 'section:member:read section:programme:read section:event:read section:flexirecord:write'
+  scope: 'section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read'
 };
 ```
 

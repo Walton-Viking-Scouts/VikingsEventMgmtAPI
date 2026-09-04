@@ -33,6 +33,7 @@ const {
 const { osmHealthLogger } = require('./utils/osmHealthLogger');
 const { detectBlockedResponse } = require('./utils/responseHelpers');
 const osmCircuitBreaker = require('./utils/osmCircuitBreaker');
+const { OSM_OAUTH_SCOPE, OSM_OAUTH_AUTHORIZE_URL } = require('./config/osm');
 
 // Successfully loaded documentation
 console.log('✅ Frontend API docs loaded:', frontendApiDocs.specs.info.title, '(' + Object.keys(frontendApiDocs.specs.paths).length + ' endpoints)');
@@ -793,6 +794,41 @@ app.post('/create-flexi-record', osmController.createFlexiRecord);
 app.post('/add-flexi-column', osmController.addFlexiColumn);
 
 /**
+ * OSM: Online payment schemes (subscriptions) proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-schemes
+ */
+app.get('/get-payment-schemes', osmController.getPaymentSchemes);
+
+/**
+ * OSM: Payment schedule proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-schedule
+ */
+app.get('/get-payment-schedule', osmController.getPaymentSchedule);
+
+/**
+ * OSM: Payment schedule details proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-schedule-details
+ */
+app.get('/get-payment-schedule-details', osmController.getPaymentScheduleDetails);
+
+/**
+ * OSM: Member payment status proxy.
+ * @tags OSM Finance
+ * @route GET /get-payment-status
+ */
+app.get('/get-payment-status', osmController.getPaymentStatus);
+
+/**
+ * OSM: Uninitiated payments proxy.
+ * @tags OSM Finance
+ * @route GET /get-uninitiated-payments
+ */
+app.get('/get-uninitiated-payments', osmController.getUninitiatedPayments);
+
+/**
  * OSM: Startup data proxy.
  * @tags OSM
  * @route GET /get-startup-data
@@ -982,7 +1018,8 @@ app.get('/oauth/debug', (req, res) => {
       !process.env.BACKEND_URL ? 'BACKEND_URL not set' : null,
       !process.env.FRONTEND_URL ? 'FRONTEND_URL not set' : null,
     ].filter(Boolean),
-    authUrl: `https://www.onlinescoutmanager.co.uk/oauth/authorize?client_id=${process.env.OAUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com')}/oauth/callback&scope=section%3Amember%3Aread%20section%3Aprogramme%3Aread%20section%3Aevent%3Aread%20section%3Aevent%3Awrite&response_type=code&state=debug`,
+    scope: OSM_OAUTH_SCOPE,
+    authUrl: `${OSM_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID || '')}&redirect_uri=${encodeURIComponent(`${process.env.BACKEND_URL || 'https://vikings-osm-backend.onrender.com'}/oauth/callback`)}&scope=${encodeURIComponent(OSM_OAUTH_SCOPE)}&response_type=code&state=debug`,
   });
 });
 
@@ -1023,11 +1060,10 @@ app.get('/oauth/login', (req, res) => {
     stateParam += `&frontend_url=${encodeURIComponent(frontend_url)}`;
   }
   
-  // OAuth scope
-  const scope = 'section:member:read section:programme:read section:event:read section:flexirecord:write';
+  const scope = OSM_OAUTH_SCOPE;
   
   // Construct the OAuth authorization URL
-  const authUrl = 'https://www.onlinescoutmanager.co.uk/oauth/authorize?' +
+  const authUrl = `${OSM_OAUTH_AUTHORIZE_URL}?` +
     `client_id=${encodeURIComponent(process.env.OAUTH_CLIENT_ID)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `state=${encodeURIComponent(stateParam)}&` +

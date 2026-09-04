@@ -237,6 +237,7 @@ VITE_API_URL=https://vikingeventmgmtapi-production.up.railway.app
 **Authentication**: `/token`, `/logout`, `/oauth/callback`, `/oauth/debug`
 **OSM Proxy**: All use Authorization header with Bearer token
 - GET endpoints: `/get-terms`, `/get-section-config`, `/get-user-roles`, `/get-events`, `/get-flexi-records`, `/get-single-flexi-record`, `/get-flexi-structure`, `/get-startup-data`
+- Finance GET endpoints (require `section:finance:read` scope): `/get-payment-schemes`, `/get-payment-schedule`, `/get-payment-schedule-details`, `/get-payment-status`, `/get-uninitiated-payments`
 - POST endpoints: `/update-flexi-record` (with enhanced validation and Sentry logging), `/get-members-grid`
 **Utility**: `/rate-limit-status`
 
@@ -262,7 +263,10 @@ NODE_ENV=development|production|test
 PORT=3000
 SENTRY_DSN=optional_sentry_dsn
 BACKEND_URL=backend_base_url
+OSM_OAUTH_SCOPE=optional_override_of_requested_osm_scopes
 ```
+
+`OSM_OAUTH_SCOPE` defaults to the scope list in `config/osm.js` (which includes `section:finance:read`). Set it only to temporarily request a narrower set, for example while the OSM app registration does not yet grant a newly added scope.
 
 ### Testing Approach
 

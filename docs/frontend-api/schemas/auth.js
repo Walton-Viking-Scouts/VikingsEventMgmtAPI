@@ -20,7 +20,7 @@
  *         scope:
  *           type: string
  *           description: OAuth scopes granted
- *           example: "section:member:read section:programme:read section:event:read section:flexirecord:write"
+ *           example: "section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read"
  *     
  *     OAuthDebugInfo:
  *       type: object

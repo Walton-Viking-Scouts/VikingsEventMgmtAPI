@@ -31,7 +31,7 @@ https://www.onlinescoutmanager.co.uk/oauth/authorize?
 - `client_id`: Your OSM OAuth client ID (`process.env.OAUTH_CLIENT_ID`)
 - `redirect_uri`: Your backend callback URL (must match exactly with OSM registration)
 - `state` (required): CSRF nonce plus an encoded/signed redirect hint for the client
-- `scope`: Required permissions (default: `section:member:read section:programme:read section:event:read section:flexirecord:write`)
+- `scope`: Required permissions (default: `section:member:read section:programme:read section:event:read section:flexirecord:write section:finance:read`)
 
 **Note**: OSM only echoes back the standard `code` and `state` parameters. Any frontend redirect information must be encoded within the `state` parameter.
 

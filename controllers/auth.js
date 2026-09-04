@@ -395,6 +395,7 @@ const getCurrentToken = (req, res) => {
     access_token: tokenData.access_token,
     expires_at: tokenData.expires_at,
     expires_in: Math.floor((tokenData.expires_at - Date.now()) / 1000),
+    scope: tokenData.scope || null,
   });
 };
 
@@ -575,6 +576,7 @@ const validateTokenEndpoint = (req, res) => {
     access_token: validation.accessToken,
     expires_at: validation.expiresAt,
     expires_in: Math.floor((validation.expiresAt - now) / 1000),
+    scope: validation.scope || null,
     sessionId: validation.sessionId,
     valid: true,
   });
